@@ -58,5 +58,5 @@ jobs:
 
       - name: Show migrations in database
         run: |
-          psql -h localhost -U admin -d -p admin defaultdb -c "SELECT * FROM __sqlx_migrations;"
+          PGPASSWORD=admin psql -h localhost -U admin -d defaultdb -c "SELECT * FROM __sqlx_migrations;"
 
