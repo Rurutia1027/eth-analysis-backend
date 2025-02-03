@@ -43,12 +43,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config build-essential
 
-      - name: Build Rust project
-        env:
-          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
-        run: cargo build
+      - name: Install Cargo Sqlx
+        run: cargo install sqlx-cli
 
       - name: Apply database migrations
         env:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
         run: cargo sqlx migrate run
+
+      - name: Build Rust project
+        env:
+          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
+        run: cargo build
+
