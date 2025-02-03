@@ -32,33 +32,33 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    steps:
-      # Step 1: Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v2
+  steps:
+    # Step 1: Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      # Step 2: Set up Rust environment
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: "1.82.0"
-          override: true
+    # Step 2: Set up Rust environment
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: "1.82.0"
+        override: true
 
-      # Step 3: Install dependencies (if needed, for example, installing `git` or other dependencies)
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config build-essential
-      - name: Apply database migrations
-        env:
-          RUSTFLAGS: "-Awarnings"       # Suppress warnings
-          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
-        run: |
-          cargo sqlx migrate run
+    # Step 3: Install dependencies (if needed, for example, installing `git` or other dependencies)
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config build-essential
+    - name: Apply database migrations
+      env:
+        RUSTFLAGS: "-Awarnings"       # Suppress warnings
+        DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
+      run: |
+        cargo sqlx migrate run
 
-      # Step 6: Build Rust project
-      - name: Build Rust project
-        env:
-          RUSTFLAGS: "-Awarnings"       # Suppress warnings
-          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
-        run: RUSTFLAGS="-Awarnings" cargo build
+    # Step 6: Build Rust project
+    - name: Build Rust project
+      env:
+        RUSTFLAGS: "-Awarnings"       # Suppress warnings
+        DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
+      run: RUSTFLAGS="-Awarnings" cargo build
