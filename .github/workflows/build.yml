@@ -12,6 +12,26 @@ jobs:
   setup:
     runs-on: ubuntu-latest
 
+  build-and-setup:
+    name: Setup Services
+    runs-on: ubuntu-latest
+
+    services:
+      # Refer to: https://docs.github.com/en/actions/use-cases-and-examples/using-containerized-services/creating-postgresql-service-containers
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_DB: defaultdb
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       # Step 1: Checkout the repository
       - name: Checkout code
@@ -29,38 +49,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config build-essential
-
-      # Step 4: Install Lighthouse (Beacon Node)
-#      - name: Install Lighthouse beacon node
-#        run: |
-#          git clone https://github.com/sigp/lighthouse.git
-#          cd lighthouse
-#          make
-
-      # Step 5: Start the beacon node locally (in the background)
-#      - name: Start Lighthouse beacon node
-#        run: |
-#          cd lighthouse
-#          nohup ./target/release/lighthouse bn --network mainnet --http > beacon.log 2>&1 &
-#
-#          # Wait for a few seconds to allow the node to start
-#          sleep 10
-#          # Check if the Lighthouse node is running by hitting its API endpoint
-#          for i in {1..60}; do
-#            if curl -s http://localhost:5052/eth/v1/node/syncing | grep -q 'is_syncing'; then
-#              echo "Beacon node is running!"
-#              exit 0
-#            fi
-#            echo "Waiting for beacon node... (attempt $i)"
-#            sleep 1
-#          done
-#          echo "Beacon node failed to start within 60 seconds."
-#          exit 1
+      - name: Apply database migrations
+        env:
+          RUSTFLAGS: "-Awarnings"       # Suppress warnings
+          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
+        run: |
+          cargo sqlx migrate run
 
       # Step 6: Build Rust project
       - name: Build Rust project
+        env:
+          RUSTFLAGS: "-Awarnings"       # Suppress warnings
+          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"  # Set database URL for tests
         run: RUSTFLAGS="-Awarnings" cargo build
-
-#      # Step 7: Run tests (if any tests are in place)
-#      - name: Run tests
-#        run: RUSTFLAGS="-Awarnings" cargo test --verbose -- --nocapture
