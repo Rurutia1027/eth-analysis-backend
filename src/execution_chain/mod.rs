@@ -1,3 +1,5 @@
+mod node;
+
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 
@@ -7,3 +9,5 @@ lazy_static! {
     pub static ref PARIS_HARD_FORK_TIMESTAMP: DateTime<Utc> =
         "2022-09-15T06:42:59Z".parse::<DateTime<Utc>>().unwrap();
 }
+
+pub use node::BlockHash;
