@@ -19,9 +19,10 @@ jobs:
 
       # Step 2: Set up Rust environment
       - name: Set up Rust
-        uses: actions/setup-rust@v1
+        uses: actions-rs/toolchain@v1
         with:
-          rust-version: stable
+          toolchain: "1.82.0"
+          override: true
 
       # Step 3: Install dependencies (if needed, for example, installing `git` or other dependencies)
       - name: Install dependencies
@@ -49,11 +50,11 @@ jobs:
 
       # Step 6: Build Rust project
       - name: Build Rust project
-        run: cargo build --release
+        run: cargo build  --verbose
 
       # Step 7: Run tests (if any tests are in place)
       - name: Run tests
-        run: cargo test --release
+        run: cargo test --verbose -- --nocapture
 
       # Optional: Push logs or artifacts (e.g., beacon.log) for further inspection
       - name: Upload Logs
