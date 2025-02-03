@@ -41,6 +41,11 @@ jobs:
         run: |
           cd lighthouse
           nohup ./target/release/lighthouse bn --network mainnet --http > beacon.log 2>&1 &
+          
+          # Wait for a few seconds to allow the node to start
+          sleep 10
+          # Check if the Lighthouse node is running by hitting its API endpoint
+          curl -s http://localhost:5052/eth/v1/node/syncing || echo "Beacon node is not responding"
 
       # Step 6: Build Rust project
       - name: Build Rust project
