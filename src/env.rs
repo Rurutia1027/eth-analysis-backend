@@ -57,7 +57,7 @@ pub fn get_env_bool(key: &str) -> Option<bool> {
 pub struct EnvConfig {
     pub beacon_url: Option<String>,
     // pub bind_public_interface: bool,
-    // pub db_url: String,
+    pub db_url: String,
     // pub etherscan_api_key: Option<String>,
     // pub dune_api_key: Option<String>,
     // // Separate out geth deltas fork URL.
@@ -72,7 +72,8 @@ pub fn get_env_config() -> EnvConfig {
         //get_env_var("BEACON_URL"),
         // bind_public_interface: get_env_bool("BIND_PUBLIC_INTERFACE").unwrap_or(true),
         //db_url: get_env_var("DATABASE_URL").expect("DATABASE_URL is required"),
-        // db_url: get_env_var("DATABASE_URL").unwrap_or("".to_string()),
+        db_url: "postgresql://admin:admin@localhost:5432/defaultdb".to_string(),
+        //get_env_var("DATABASE_URL").unwrap_or("".to_string()),
         // etherscan_api_key: get_env_var("ETHERSCAN_API_KEY"),
         // dune_api_key: get_env_var("DUNE_API_KEY"),
         // geth_url: get_env_var("GETH_URL"),
