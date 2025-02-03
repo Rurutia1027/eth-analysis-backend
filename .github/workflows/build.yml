@@ -1,0 +1,58 @@
+name: Build and Setup Eth Analysis Backend
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Rust environment
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      # Step 3: Install dependencies (if needed, for example, installing `git` or other dependencies)
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config build-essential
+
+      # Step 4: Install Lighthouse (Beacon Node)
+      - name: Install Lighthouse beacon node
+        run: |
+          git clone https://github.com/sigp/lighthouse.git
+          cd lighthouse
+          make
+
+      # Step 5: Start the beacon node locally (in the background)
+      - name: Start Lighthouse beacon node
+        run: |
+          cd lighthouse
+          nohup ./target/release/lighthouse bn --network mainnet --http > beacon.log 2>&1 &
+
+      # Step 6: Build Rust project
+      - name: Build Rust project
+        run: cargo build --release
+
+      # Step 7: Run tests (if any tests are in place)
+      - name: Run tests
+        run: cargo test --release
+
+      # Optional: Push logs or artifacts (e.g., beacon.log) for further inspection
+      - name: Upload Logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: beacon-logs
+          path: lighthouse/beacon.log
