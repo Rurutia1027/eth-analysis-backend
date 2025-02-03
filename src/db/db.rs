@@ -43,7 +43,7 @@ pub mod tests {
     ];
 
     pub async fn get_test_db_connection() -> sqlx::PgConnection {
-        if !ENV_CONFIG.db_url.contains("testdb") {
+        if !ENV_CONFIG.test_db_url.contains("testdb") {
             panic!("tried to run tests against db that is not 'testdb")
         }
         get_db_connection("testing").await

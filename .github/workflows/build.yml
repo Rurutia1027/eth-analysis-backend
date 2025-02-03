@@ -56,6 +56,12 @@ jobs:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
         run: cargo build
 
+      - name: Run Rust project tests
+        env:
+          DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
+          TEST_DATABASE_URL: "postgresql://admin:admin@localhost:5432/testdb"
+        run: cargo test
+
       - name: Show migrations in database
         run: |
           PGPASSWORD=admin psql -h localhost -U admin -d defaultdb -c "SELECT * FROM _sqlx_migrations;"
