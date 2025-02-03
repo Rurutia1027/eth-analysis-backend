@@ -55,10 +55,3 @@ jobs:
       # Step 7: Run tests (if any tests are in place)
       - name: Run tests
         run: cargo test --verbose -- --nocapture
-
-      # Optional: Push logs or artifacts (e.g., beacon.log) for further inspection
-      - name: Upload Logs
-        uses: actions/upload-artifact@v2
-        with:
-          name: beacon-logs
-          path: lighthouse/beacon.log
