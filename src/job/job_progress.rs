@@ -5,15 +5,15 @@ use crate::kv_store::KvStore;
 use serde::{de::DeserializeOwned, Serialize};
 
 pub struct JobProgress<'a, A: Serialize + DeserializeOwned> {
-    key_value_store: &'a dyn KvStore,
     key: &'static str,
+    key_value_store: &'a dyn KvStore,
     phantom: std::marker::PhantomData<A>,
 }
 
 impl<A: Serialize + DeserializeOwned> JobProgress<'_, A> {
     pub fn new<'a>(
         key: &'static str,
-        kv_store: &'a impl KvStore,
+        key_value_store: &'a impl KvStore,
     ) -> JobProgress<'a, A> {
         JobProgress {
             key,
@@ -31,7 +31,7 @@ impl<A: Serialize + DeserializeOwned> JobProgress<'_, A> {
 
     pub async fn set(&self, value: &A) {
         self.key_value_store
-            .set_value(self.key, &serde_json::to_value(value).unwrap())
+            .set(self.key, &serde_json::to_value(value).unwrap())
             .await
     }
 }
