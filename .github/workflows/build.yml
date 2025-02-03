@@ -31,31 +31,31 @@ jobs:
           sudo apt-get install -y libssl-dev pkg-config build-essential
 
       # Step 4: Install Lighthouse (Beacon Node)
-      - name: Install Lighthouse beacon node
-        run: |
-          git clone https://github.com/sigp/lighthouse.git
-          cd lighthouse
-          make
+#      - name: Install Lighthouse beacon node
+#        run: |
+#          git clone https://github.com/sigp/lighthouse.git
+#          cd lighthouse
+#          make
 
       # Step 5: Start the beacon node locally (in the background)
-      - name: Start Lighthouse beacon node
-        run: |
-          cd lighthouse
-          nohup ./target/release/lighthouse bn --network mainnet --http > beacon.log 2>&1 &
-          
-          # Wait for a few seconds to allow the node to start
-          sleep 10
-          # Check if the Lighthouse node is running by hitting its API endpoint
-          for i in {1..60}; do
-            if curl -s http://localhost:5052/eth/v1/node/syncing | grep -q 'is_syncing'; then
-              echo "Beacon node is running!"
-              exit 0
-            fi
-            echo "Waiting for beacon node... (attempt $i)"
-            sleep 1
-          done
-          echo "Beacon node failed to start within 60 seconds."
-          exit 1
+#      - name: Start Lighthouse beacon node
+#        run: |
+#          cd lighthouse
+#          nohup ./target/release/lighthouse bn --network mainnet --http > beacon.log 2>&1 &
+#
+#          # Wait for a few seconds to allow the node to start
+#          sleep 10
+#          # Check if the Lighthouse node is running by hitting its API endpoint
+#          for i in {1..60}; do
+#            if curl -s http://localhost:5052/eth/v1/node/syncing | grep -q 'is_syncing'; then
+#              echo "Beacon node is running!"
+#              exit 0
+#            fi
+#            echo "Waiting for beacon node... (attempt $i)"
+#            sleep 1
+#          done
+#          echo "Beacon node failed to start within 60 seconds."
+#          exit 1
 
       # Step 6: Build Rust project
       - name: Build Rust project
