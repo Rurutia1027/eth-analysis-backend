@@ -273,7 +273,7 @@ mod tests {
                 .unwrap();
         assert!(true);
         todo!("here test logic should be refined after we implement\
-         store_block which responsible for inserting beacon blocks to beacon_blocks table")
-        // assert_eq!(GweiNewtype(100), beacon_balances_sum);
+         store_block which responsible for inserting beacon blocks to beacon_blocks table");
+        assert_eq!(GweiNewtype(100), beacon_balances_sum);
     }
 }
