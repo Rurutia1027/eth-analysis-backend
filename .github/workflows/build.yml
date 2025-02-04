@@ -53,7 +53,10 @@ jobs:
       - name: Build Rust project
         env:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
-        run: cargo build
+          CARGO_LOG: "cargo::core::compiler::fingerprint=info"
+          RUSTC_LOG: "debug"
+        run: |
+          cargo build -vv 
 
       - name: Run Rust project tests
         env:
