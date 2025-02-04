@@ -15,6 +15,8 @@ pub use heal::heal_block_hashes;
 pub const GENESIS_PARENT_ROOT: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000000";
 
+// query deposit_sum_aggregated field from table beacon_blocks table
+// in which block_root:string is the primary key
 pub async fn get_deposit_sum_from_block_root(
     executor: impl PgExecutor<'_>,
     block_root: &str,
@@ -28,6 +30,210 @@ pub async fn get_deposit_sum_from_block_root(
         .into()
 }
 
+// retrieve withdrawal_sum_aggregated field value from table beacon_blocks
+// by providing the primary key value -- block_root
+pub async fn get_withdrawal_sum_from_block_root(
+    executor: impl PgExecutor<'_>,
+    block_root: &str,
+) -> GweiNewtype {
+    sqlx::query!(
+        "
+        SELECT
+            withdrawal_sum_aggregated
+        FROM
+            beacon_blocks
+        WHERE
+            block_root = $1
+        ",
+        block_root
+    )
+    .fetch_one(executor)
+    .await
+    .unwrap()
+    .withdrawal_sum_aggregated
+    .unwrap_or_default()
+    .into()
+}
+
+// check from db table beacon_blocks where there is any records with
+// the given block_root(block hash in string) value.
+pub async fn get_is_hash_known(
+    executor: impl PgExecutor<'_>,
+    block_root: &str,
+) -> bool {
+    // if given block hash is genesis the initial block hash value
+    // this should always exist return true is ok
+    if block_root == GENESIS_PARENT_ROOT {
+        return true;
+    }
+
+    // otherwise query from the db directly
+    sqlx::query(
+        "
+                SELECT EXISTS(
+                    SELECT 1 FROM beacon_blocks
+                    WHERE block_root = $1
+                )
+            ",
+    )
+    .bind(block_root)
+    .fetch_one(executor)
+    .await
+    .unwrap()
+    .get("exists")
+}
+
+// insert BeaconBlock into table beacon_block table
+pub async fn store_block(
+    executor: impl PgExecutor<'_>,
+    block: &BeaconBlock,
+    deposit_sum: &GweiNewtype,
+    deposit_sum_aggregated: &GweiNewtype,
+    withdrawal_sum: &GweiNewtype,
+    withdrawal_sum_aggregated: &GweiNewtype,
+    header: &BeaconHeaderSignedEnvelope,
+) {
+    sqlx::query!(
+        "
+        INSERT INTO beacon_blocks (
+            block_hash,
+            block_root,
+            deposit_sum,
+            deposit_sum_aggregated,
+            withdrawal_sum,
+            withdrawal_sum_aggregated,
+            parent_root,
+            state_root
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8
+        )
+        ",
+        block.block_hash(),
+        header.root,
+        i64::from(deposit_sum.to_owned()),
+        i64::from(deposit_sum_aggregated.to_owned()),
+        i64::from(withdrawal_sum.to_owned()),
+        i64::from(withdrawal_sum_aggregated.to_owned()),
+        header.parent_root(),
+        header.state_root(),
+    )
+    .execute(executor)
+    .await
+    .unwrap();
+}
+
+// delete all records in beacon_blocks with each beacon_blocks#state_root value
+// locates in the range of the set that constructed by query results
+// from querying from table beacon_states with beacon_state#slot >= given slot value
+pub async fn delete_blocks(
+    executor: impl PgExecutor<'_>,
+    greater_than_or_equal: Slot,
+) {
+    sqlx::query!(
+        "
+        DELETE FROM beacon_blocks
+        WHERE state_root IN (
+                SELECT
+                    state_root
+                FROM
+                    beacon_states
+               WHERE beacon_states.slot >= $1
+           )",
+        greater_than_or_equal.0
+    )
+    .execute(executor)
+    .await
+    .unwrap();
+}
+
+// delete single block with state_root locates in the query result
+// that it's query result from query table beacon_states value slot value equal to query parameter
+pub async fn delete_block(executor: impl PgExecutor<'_>, slot: Slot) {
+    sqlx::query(
+        "
+        DELETE FROM beacon_blocks
+        WHERE state_root IN (
+            SELECT
+                state_root
+            FROM
+                beacon_states
+            WHERE slot = $1
+        )
+        ",
+    )
+    .bind(slot.0)
+    .execute(executor)
+    .await
+    .unwrap();
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DbBlock {
+    block_root: String,
+    deposit_sum: GweiNewtype,
+    deposit_sum_aggregated: GweiNewtype,
+    parent_root: String,
+    pub block_hash: Option<String>,
+    pub state_root: String,
+}
+
+struct BlockDbRow {
+    block_root: String,
+    deposit_sum: i64,
+    deposit_sum_aggregated: i64,
+    parent_root: String,
+    pub block_hash: Option<String>,
+    pub state_root: String,
+}
+
+// converted BlockDbRow into DbBlock
+impl From<BlockDbRow> for DbBlock {
+    fn from(value: BlockDbRow) -> Self {
+        Self {
+            block_hash: value.block_hash,
+            block_root: value.block_root,
+            deposit_sum: value.deposit_sum.into(),
+            deposit_sum_aggregated: value.deposit_sum_aggregated.into(),
+            parent_root: value.parent_root,
+            state_root: value.state_root,
+        }
+    }
+}
+
+// get a series of blocks which each slot value <= given query slot value
+pub async fn get_block_before_slot(
+    executor: impl PgExecutor<'_>,
+    less_than: Slot,
+) -> DbBlock {
+    sqlx::query_as!(
+        BlockDbRow,
+        "
+        SELECT
+            block_root,
+            beacon_blocks.state_root,
+            parent_root,
+            deposit_sum,
+            deposit_sum_aggregated,
+            block_hash
+        FROM
+            beacon_blocks
+        JOIN
+            beacon_states ON beacon_blocks.state_root = beacon_states.state_root
+        WHERE slot < $1
+        ORDER BY slot DESC
+        LIMIT 1
+        ",
+        less_than.0
+    )
+    .fetch_one(executor)
+    .await
+    .unwrap()
+    .into()
+}
+
+// update field of block_hash value in table beacon_blocks
+// querying the satisfied records by its block_root value the primary key of table beacon_blocks
 pub async fn update_block_hash(
     executor: impl PgExecutor<'_>,
     block_root: &str,
@@ -45,4 +251,33 @@ pub async fn update_block_hash(
     .execute(executor)
     .await
     .unwrap();
+}
+
+pub async fn get_block_by_slot(
+    executor: impl PgExecutor<'_>,
+    slot: Slot,
+) -> Option<DbBlock> {
+    sqlx::query_as!(
+        BlockDbRow,
+        r#"
+        SELECT
+            block_root,
+            beacon_blocks.state_root,
+            parent_root,
+            deposit_sum,
+            deposit_sum_aggregated,
+            block_hash
+        FROM
+            beacon_blocks
+        JOIN beacon_states ON
+            beacon_blocks.state_root = beacon_states.state_root
+        WHERE
+            slot = $1
+        "#,
+        slot.0
+    )
+    .fetch_optional(executor)
+    .await
+    .unwrap()
+    .map(|row| row.into())
 }
