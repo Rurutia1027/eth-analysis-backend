@@ -281,3 +281,104 @@ pub async fn get_block_by_slot(
     .unwrap()
     .map(|row| row.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use db::db::tests;
+    use sqlx::Acquire;
+
+    use super::*;
+    use crate::{
+        beacon_chain::node::{
+            BeaconBlockBody, BeaconHeader, BeaconHeaderEnvelope, BeaconNode,
+            ExecutionPayload,
+        },
+        db,
+    };
+
+    pub async fn get_last_block_slot(
+        executor: impl PgExecutor<'_>,
+    ) -> Option<Slot> {
+        sqlx::query!(
+            "
+            SELECT
+                beacon_states.slot
+            FROM
+                beacon_blocks
+            JOIN
+                beacon_states
+            ON
+                beacon_states.state_root = beacon_blocks.state_root
+            ORDER BY slot DESC
+            LIMIT 1
+            ",
+        )
+        .fetch_optional(executor)
+        .await
+        .unwrap()
+        .map(|row| Slot(row.slot))
+    }
+
+    #[tokio::test]
+    async fn get_is_genesis_known_test() {
+        let mut connection = tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
+
+        let is_hash_known =
+            get_is_hash_known(&mut *transaction, GENESIS_PARENT_ROOT).await;
+        assert!(is_hash_known)
+    }
+
+    #[tokio::test]
+    async fn get_is_hash_known_test() {}
+
+    #[tokio::test]
+    async fn get_is_hash_not_known_test() {
+        let mut connection = tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
+
+        let is_hash_known =
+            get_is_hash_known(&mut *transaction, "0x-unknown-block-hash").await;
+        assert!(!is_hash_known)
+    }
+
+    #[tokio::test]
+    async fn store_block_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn get_last_block_number_none_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn get_last_block_number_some_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn delete_block_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn get_block_before_slot_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn get_block_before_missing_slot_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn update_block_hash_test() {
+        assert!(true)
+    }
+
+    #[tokio::test]
+    async fn get_block_by_slot_test() {
+        assert!(true)
+    }
+}
