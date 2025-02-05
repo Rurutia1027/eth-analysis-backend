@@ -1,12 +1,17 @@
-mod balances;
-mod blocks;
-mod node;
-mod states;
-mod sync;
-mod units;
+use crate::beacon_chain::{
+    balances, node::BeaconNode, node::BeaconNodeHttp, Slot,
+};
+use futures::{pin_mut, StreamExt};
+use pit_wall::Progress;
+use sqlx::PgPool;
+use tracing::{debug, info, warn};
 
-use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
-use serde::Serialize;
-pub use units::slot_from_string;
-pub use units::Slot;
+const GET_BALANCES_CONCURRENCY_LIMIT: usize = 32;
+const SLOTS_PER_EPOCH: i64 = 32;
+
+pub enum Granularity {
+    Day,
+    Epoch,
+    Hour,
+    Slot,
+}
