@@ -4,11 +4,10 @@ use crate::units::GweiNewtype;
 use sqlx::{PgExecutor, Row};
 
 use super::{
-    node::{BeaconHeaderSignedEnvelope, BeaconNode},
+    node::{BeaconBlock, BeaconHeader, BeaconHeaderSignedEnvelope, BeaconNode},
     Slot,
 };
 
-use crate::beacon_chain::node::BeaconBlock;
 use crate::job::job_progress;
 pub use heal::heal_block_hashes;
 
@@ -288,6 +287,7 @@ mod tests {
     use sqlx::Acquire;
 
     use super::*;
+    use crate::beacon_chain::states::store_state;
     use crate::{
         beacon_chain::node::{
             BeaconBlockBody, BeaconHeader, BeaconHeaderEnvelope, BeaconNode,
@@ -344,7 +344,44 @@ mod tests {
 
     #[tokio::test]
     async fn store_block_test() {
-        assert!(true)
+        let mut connection = tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
+        let state_root = "0xblock_test_state_root".to_string();
+        let slot = Slot(0);
+        store_state(&mut *transaction, &state_root, slot).await;
+        store_block(
+            &mut *transaction,
+            // &BeanBlock
+            &BeaconBlock {
+                body: BeaconBlockBody {
+                    deposits: vec![],
+                    execution_payload: None,
+                },
+                parent_root: GENESIS_PARENT_ROOT.to_string(),
+                slot,
+                state_root: state_root.clone(),
+            },
+            // deposit_sum
+            &GweiNewtype(0),
+            // deposit_sum_aggregated
+            &GweiNewtype(0),
+            // withdrawal_sum
+            &GweiNewtype(0),
+            // withdrawal_sum_aggregated
+            &GweiNewtype(0),
+            // header
+            &BeaconHeaderSignedEnvelope {
+                root: "0xblock_root".to_string(),
+                header: BeaconHeaderEnvelope {
+                    message: BeaconHeader {
+                        slot,
+                        parent_root: GENESIS_PARENT_ROOT.to_string(),
+                        state_root: state_root.clone(),
+                    },
+                },
+            },
+        )
+        .await
     }
 
     #[tokio::test]
