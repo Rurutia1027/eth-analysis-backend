@@ -1,4 +1,5 @@
 pub mod backfill;
+mod effective_sums;
 
 use super::node::{BeaconNode, BeaconNodeHttp, ValidatorBalance};
 use super::{states::get_last_state, GweiInTime, Slot};
