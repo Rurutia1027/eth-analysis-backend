@@ -50,9 +50,10 @@ pub mod tests {
     use crate::beacon_chain::states::store_state;
     use crate::units::GweiNewtype;
     use sqlx::{Acquire, PgConnection};
+    use crate::beacon_chain::Slot;
 
-    pub async fn store_test_block(executor: &mut PgConnection, test_id: &str) {
-        let header = BeaconHeaderSignedEnvelopeBuilder::new(test_id).build();
+    pub async fn store_test_block(executor: &mut PgConnection, test_id: &str, slot: Slot) {
+        let header = BeaconHeaderSignedEnvelopeBuilder::new(test_id, slot).build();
         let block = Into::<BeaconBlockBuilder>::into(&header).build();
         store_custom_test_block(executor, &header, &block).await
     }

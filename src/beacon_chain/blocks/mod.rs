@@ -346,7 +346,7 @@ mod tests {
         let mut connection = tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
         let state_root = "0xblock_test_state_root".to_string();
-        let slot = Slot(0);
+        let slot = Slot(77777);
         store_state(&mut *transaction, &state_root, slot).await;
         store_block(
             &mut *transaction,
@@ -416,12 +416,12 @@ mod tests {
         let mut connection = db::db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
 
-        store_test_block(&mut transaction, "delete_block_test").await;
+        store_test_block(&mut transaction, "delete_block_test", Slot(233)).await;
 
         let block_slot = get_last_block_slot(&mut *transaction).await;
-        assert_eq!(block_slot, Some(Slot(0)));
+        assert_eq!(block_slot, Some(Slot(233)));
 
-        delete_blocks(&mut *transaction, Slot(0)).await;
+        delete_blocks(&mut *transaction, Slot(233)).await;
 
         let block_slot = get_last_block_slot(&mut *transaction).await;
         assert_eq!(block_slot, None);

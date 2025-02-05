@@ -69,9 +69,12 @@ pub async fn store_effective_balance_sum(
 mod tests {
     use anyhow::{anyhow, Result};
     use async_trait::async_trait;
+    use sqlx::Acquire;
     use test_context::test_context;
 
     use super::*;
+    use crate::beacon_chain::states::store_state;
+    use crate::db::db;
     use crate::{
         beacon_chain::{
             self,
@@ -84,10 +87,8 @@ mod tests {
         db::db::tests::TestDb,
         units::GweiNewtype,
     };
-    use crate::beacon_chain::states::store_state;
 
-    const SLOT_0_STATE_ROOT: &str =
-        "0x7e76880eb67bbdc86250aa578958e9d0675e64e714337855204fb5abaaf82c2b";
+    const SLOT_0_STATE_ROOT: &str = "0x_mock_slot_state_root";
 
     #[tokio::test]
     async fn test_get_effective_balance_sum() {
@@ -100,21 +101,21 @@ mod tests {
         assert_eq!(sum, expected_sum);
     }
 
-    #[test_context(TestDb)]
     #[tokio::test]
-    async fn test_store_effective_balance_sum(test_db: &TestDb) {
+    async fn test_store_effective_balance_sum() {
+        let mut connection = db::tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
         let state_root = SLOT_0_STATE_ROOT;
         let sum = GweiNewtype(9500000);
 
         // save record of beacon_states with its inner field effective_balance_sum as empty
-        store_state(&test_db.pool, state_root, Slot(0)).await;
+        store_state(&mut *transaction, state_root, Slot(1000)).await;
         // append the effective_balance_sum field value to the record that is inserted
-        store_effective_balance_sum(&test_db.pool, state_root, &sum).await;
-
+        store_effective_balance_sum(&mut *transaction, state_root, &sum).await;
 
         // query value of effective_balance_sum value by the state_root value
         // and fetch the record's effective_balance_sum
-        let stored_sum: i64 = sqlx::query_scalar!(
+        let stored_sum: i64 = sqlx::query!(
             "
             SELECT effective_balance_sum
             FROM beacon_states
@@ -122,10 +123,11 @@ mod tests {
             ",
             state_root
         )
-            .fetch_one(&test_db.pool)
-            .await
-            .unwrap()
-            .unwrap();
+        .fetch_one(&mut *transaction)
+        .await
+        .unwrap()
+        .effective_balance_sum
+        .unwrap();
 
         // value should match the inserted sum value: 9500000 Gwei
         assert_eq!(stored_sum, sum.0);

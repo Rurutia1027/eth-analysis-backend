@@ -90,14 +90,14 @@ pub struct BeaconHeaderSignedEnvelopeBuilder {
 }
 
 impl BeaconHeaderSignedEnvelopeBuilder {
-    pub fn new(test_id: &str) -> Self {
+    pub fn new(test_id: &str, slot: Slot) -> Self {
         let state_root = format!("0x{test_id}_state_root");
         let block_root = format!("0x{test_id}_block_root");
 
         Self {
             block_root,
             state_root,
-            slot: Slot(0),
+            slot,
             parent_root: GENESIS_PARENT_ROOT.to_string(),
         }
     }
