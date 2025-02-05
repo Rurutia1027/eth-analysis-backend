@@ -14,14 +14,17 @@ pub fn get_deposit_sum_from_block(block: &BeaconBlock) -> GweiNewtype {
         .fold(GweiNewtype(0), |sum, deposit| sum + deposit.amount)
 }
 
-// get each deposit's amount fields' aggregated sum value as return value
-// by providing the block
-// if given beacon block's slot is GENESIS it is the root block, it's associated deposit items is none, so the return value is 0
-// otherwise, invoke request to beacon_blocks table and query all records with record's block_root the same as given block's parent_root value
-// then fetch this record's
-// query(block) -> beacon_blocks -> got current query block's parent block hash value as the return record
-// then get the parent block record's  deposit_sum_aggregated this is current block's all deposit amount sum value as parent_deposit_sum_aggregated
-// then, traverse current block's all deposit's amount value as the return result
+/// Computes the aggregated sum of deposit amounts for a given beacon block.
+///
+/// - If the block is the genesis block, returns `0` since it has no associated deposits.
+/// - Otherwise, retrieves the parent block's deposit sum and adds the current block's deposits.
+///
+/// # Arguments
+/// * `executor` - A database executor for querying deposit data.
+/// * `block` - The beacon block for which the deposit sum needs to be computed.
+///
+/// # Returns
+/// A `GweiNewtype` representing the total deposit sum aggregated up to the given block.
 pub async fn get_deposit_sum_aggregated(
     executor: impl PgExecutor<'_>,
     block: &BeaconBlock,
