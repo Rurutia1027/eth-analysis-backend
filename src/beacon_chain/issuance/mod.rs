@@ -1,5 +1,6 @@
 use super::Slot;
 use crate::beacon_chain::node::Withdrawal;
+use crate::beacon_chain::states::get_last_state;
 use crate::{db::db, units::GweiNewtype};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -214,12 +215,14 @@ impl IssuanceStore for IssuanceStoragePostgres {
         )
     }
 
+    // todo: missing params define in the scope of execution chain
     async fn issuance_from_time_frame(
         &self,
     ) -> Result<GweiNewtype, IssuanceUnavailableError> {
         Ok(GweiNewtype(0))
     }
 
+    /// weekly issuance in Gwei
     async fn weekly_issuance(&self) -> GweiNewtype {
         let (d14_issuance, now_issuance) =
             join!(self.n_days_ago_issuance(14), self.current_issuance());
@@ -244,9 +247,51 @@ struct IssuanceEstimate {
     issuance_per_slot_gwei: f64,
 }
 
+/// Calculate the estimated issuance per flot in Gwei.
+/// Fetches last week's total issuance and divides it by the number of slots per week.
+/// Returns `None` if the issuance data is unavailable
 async fn get_issuance_per_slot_estimate(
     issuance_store: &impl IssuanceStore,
 ) -> f64 {
     let last_week_issuance = issuance_store.weekly_issuance().await;
     last_week_issuance.0 as f64 / SLOTS_PER_WEEK
+}
+
+// this is also the main entry point of issuance estimate service
+// and this main entry function will be invoked in update-issuance-estimate.ts (not implemented yet)
+// also the calculated final result will be updated to the project cache store(not implemented yet)
+pub async fn update_issuance_estimate() {
+    info!("updating issuance estimate");
+    // create db connection pool instance with max connection = 3, and pool name as 'update-issuance-estimate'
+    let db_pool = db::get_db_pool("update-issuance-estimate", 3).await;
+    let issuance_store = IssuanceStoragePostgres::new(db_pool.clone());
+
+    // get how many issuances in gwei per slot
+    let issuance_per_slot_gwei =
+        get_issuance_per_slot_estimate(&issuance_store).await;
+    debug!("issuance per slot estimate: {}", issuance_per_slot_gwei);
+
+    // here we get the freshest/latest state_root from the beacon_states table
+    let slot = get_last_state(&db_pool)
+        .await
+        .expect(
+            "expect last state to exist in order to update issuance estimate",
+        )
+        .slot;
+
+    // get the timestamp value of the beacon_states' latest record
+    let timestamp = slot.date_time();
+
+    // create instance of struct IssuanceEstimate value by passing the values of
+    // slot value, latest beacon_state's ts, and the estimateed issuance per slot value in the unit of Gwei
+    let issuance_estimate = IssuanceEstimate {
+        slot,
+        timestamp,
+        issuance_per_slot_gwei,
+    };
+
+    // finally publish the aggregated value struct instance to cache to let frontend request to fetch
+    // but cache we haven't implment yet , just add a todo!() and print the value for now is ok
+    todo!("publish the calculated issuance estimate value to the cache");
+    info!("updated issuance estimate")
 }
