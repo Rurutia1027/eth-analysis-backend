@@ -1,4 +1,3 @@
-use std::os::macos::raw::stat;
 use crate::beacon_chain::{
     balances, node::BeaconNode, node::BeaconNodeHttp, Slot,
 };
