@@ -6,6 +6,7 @@ mod node;
 mod states;
 mod sync;
 mod units;
+mod withdrawals;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
