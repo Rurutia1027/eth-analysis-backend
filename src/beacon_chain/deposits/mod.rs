@@ -88,7 +88,7 @@ mod tests {
         let mut transaction = connection.begin().await.unwrap();
         let test_id = "get_deposits_sum_by_state_root";
         let test_header =
-            BeaconHeaderSignedEnvelopeBuilder::new(test_id).build();
+            BeaconHeaderSignedEnvelopeBuilder::new(test_id, Slot(222)).build();
         let test_block = Into::<BeaconBlockBuilder>::into(&test_header).build();
 
         // first save record to beacon_states

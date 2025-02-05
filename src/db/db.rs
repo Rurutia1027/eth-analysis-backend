@@ -64,7 +64,7 @@ pub mod tests {
 
     impl TestDb {
         pub async fn new() -> Self {
-            let name = format!("testdb_{}", nanoid!(10, &ALPHABET));
+            let name = format!("testdb_{}", nanoid!(15, &ALPHABET));
 
             let mut connection = get_test_db_connection().await;
             println!("create test database for testing with the db name as {name}");
