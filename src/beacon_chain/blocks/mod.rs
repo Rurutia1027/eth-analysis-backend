@@ -125,25 +125,23 @@ pub async fn store_block(
 // delete all records in beacon_blocks with each beacon_blocks#state_root value
 // locates in the range of the set that constructed by query results
 // from querying from table beacon_states with beacon_state#slot >= given slot value
-pub async fn delete_blocks(
-    executor: impl PgExecutor<'_>,
-    greater_than_or_equal: Slot,
-) {
+pub async fn delete_blocks(executor: impl PgExecutor<'_>, greater_than_or_equal: Slot) {
     sqlx::query!(
         "
         DELETE FROM beacon_blocks
         WHERE state_root IN (
-                SELECT
-                    state_root
-                FROM
-                    beacon_states
-               WHERE beacon_states.slot >= $1
-           )",
+            SELECT
+                state_root
+            FROM
+                beacon_states
+            WHERE beacon_states.slot >= $1
+        )
+        ",
         greater_than_or_equal.0
     )
-    .execute(executor)
-    .await
-    .unwrap();
+        .execute(executor)
+        .await
+        .unwrap();
 }
 
 // delete single block with state_root locates in the query result
@@ -287,7 +285,7 @@ mod tests {
     use sqlx::Acquire;
 
     use super::*;
-    use crate::beacon_chain::states::store_state;
+    use crate::beacon_chain::states::{get_last_state, store_state};
     use crate::{
         beacon_chain::node::{
             BeaconBlockBody, BeaconHeader, BeaconHeaderEnvelope, BeaconNode,
@@ -381,12 +379,19 @@ mod tests {
                 },
             },
         )
-        .await
+        .await;
+
+        let is_hash_known =
+            get_is_hash_known(&mut *transaction, "0xblock_root").await;
+        assert!(is_hash_known);
     }
 
     #[tokio::test]
     async fn get_last_block_number_none_test() {
-        assert!(true)
+        let mut connection = db::db::tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
+        let block_number = get_last_block_slot(&mut *transaction);
+        assert!(block_number.await.is_none())
     }
 
     #[tokio::test]
@@ -394,9 +399,74 @@ mod tests {
         assert!(true)
     }
 
+    // this beacon_blocks table record deletion by slot value associates with two table
+    // the anchor table: beacon_states stores the state_root and slot value
+    // the beacon_blocks table which takes state_root as its primary key
+    // deletion is separated two steps:
+    // 1. query anchor table -- beacon_states by given slot value, and get its state_root
+    // 2. then take the `state_root` value that queried from beacon_states and invoke delete operation in table beacon_blocks
+
+    // so in this test case, we need first insert a record to beacon_states table
+    // and take the inserted beacon_states#state_root value to build a beacon_blocks reacord and insert to table beacon_blocks.
+    // then during test, it will executed the operations as expected.
     #[tokio::test]
     async fn delete_block_test() {
-        assert!(true)
+        let mut connection = tests::get_test_db_connection().await;
+        let mut transaction = connection.begin().await.unwrap();
+
+        let state_root = "0xblock_test_state_root".to_string();
+        let slot = Slot(0);
+        store_state(&mut *transaction, &state_root, slot).await;
+
+        store_block(
+            &mut *transaction,
+            // &BeanBlock
+            &BeaconBlock {
+                body: BeaconBlockBody {
+                    deposits: vec![],
+                    execution_payload: None,
+                },
+                parent_root: GENESIS_PARENT_ROOT.to_string(),
+                slot,
+                state_root: state_root.clone(),
+            },
+            // deposit_sum
+            &GweiNewtype(0),
+            // deposit_sum_aggregated
+            &GweiNewtype(0),
+            // withdrawal_sum
+            &GweiNewtype(0),
+            // withdrawal_sum_aggregated
+            &GweiNewtype(0),
+            // header
+            &BeaconHeaderSignedEnvelope {
+                root: "0xblock_root".to_string(),
+                header: BeaconHeaderEnvelope {
+                    message: BeaconHeader {
+                        slot,
+                        parent_root: GENESIS_PARENT_ROOT.to_string(),
+                        state_root: state_root.clone(),
+                    },
+                },
+            },
+        )
+        .await;
+
+        // first we check that block already inserted to table beacon_blocks
+        let block_slot = get_last_block_slot(&mut *transaction).await;
+        assert!(block_slot.is_some());
+        assert_eq!(block_slot.unwrap(), Slot(0));
+
+        let state = get_last_state(&mut *transaction).await;
+        assert!(state.is_some());
+
+        // invoke delete by providing Slot -> query beacon_states -> states_root -> beacon_blocks
+        delete_blocks(&mut *transaction, Slot(0));
+
+        let block_slot = get_last_block_slot(&mut *transaction).await;
+
+        // this block record should be removed
+        assert_eq!(block_slot, None);
     }
 
     #[tokio::test]
