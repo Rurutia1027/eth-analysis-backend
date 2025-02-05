@@ -1,4 +1,4 @@
-mod blocks;
+pub mod blocks;
 ///! Functions and Data Structures defined for communicate with a BeanconChain node to get various pieces of data.
 ///! Currently, many calls taking a state_root as input do not acknowledge that a state_root may disappear at any time.
 ///! They should be updated to do so.
