@@ -42,9 +42,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config build-essential
 
+      - name: Add Linux target
+        run: rustup target add x86_64-unknown-linux-gnu
+
       - name: Install Cargo Sqlx
         run: cargo install sqlx-cli
-
       - name: Apply database migrations
         env:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
@@ -53,18 +55,15 @@ jobs:
       - name: Build Rust project
         env:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
-        run: |
-          grep -r "macos" ~/.cargo/registry/src
-          cargo build -verbose 
-          grep -r "macos" ~/.cargo/registry/src
+        run: |          
+          cargo build --target x86_64-unknown-linux-gnu --release
 
       - name: Run Rust project tests
         env:
           DATABASE_URL: "postgresql://admin:admin@localhost:5432/defaultdb"
           TEST_DATABASE_URL: "postgresql://admin:admin@localhost:5432/testdb"
-        run: cargo test
+        run: cargo test --target x86_64-unknown-linux-gnu
 
       - name: Show migrations in database
         run: |
           PGPASSWORD=admin psql -h localhost -U admin -d defaultdb -c "SELECT * FROM _sqlx_migrations;"
-
