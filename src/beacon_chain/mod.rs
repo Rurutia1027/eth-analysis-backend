@@ -5,6 +5,7 @@ mod states;
 mod sync;
 mod units;
 mod deposits;
+mod issuance;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
