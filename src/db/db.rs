@@ -13,6 +13,7 @@ pub async fn get_db_pool(name: &str, max_connections: u32) -> PgPool {
             })
         })
         .max_connections(max_connections)
+        .max_lifetime(std::time::Duration::from_secs(20))
         .connect(&ENV_CONFIG.db_url)
         .await
         .expect("expect DB to be available to connect")
@@ -34,7 +35,7 @@ pub mod tests {
     use nanoid::nanoid;
     use sqlx::postgres::PgPoolOptions;
     use test_context::AsyncTestContext;
-
+    use tracing::info;
     use super::*;
 
     const ALPHABET: [char; 16] = [
@@ -66,13 +67,15 @@ pub mod tests {
             let name = format!("testdb_{}", nanoid!(10, &ALPHABET));
 
             let mut connection = get_test_db_connection().await;
+            println!("create test database for testing with the db name as {name}");
             sqlx::query(&format!("CREATE DATABASE {name}"))
                 .execute(&mut connection)
                 .await
                 .unwrap();
 
             let pool = PgPoolOptions::new()
-                .max_connections(1)
+                .max_connections(5)
+                .max_lifetime(std::time::Duration::from_secs(20))
                 .connect(&ENV_CONFIG.db_url.replace("testdb", &name))
                 .await
                 .unwrap();
