@@ -1,4 +1,6 @@
 use crate::beacon_chain::node::Withdrawal;
+use crate::beacon_chain::slots;
+use crate::beacon_chain::slots::Slot;
 use crate::beacon_chain::states::get_last_state;
 use crate::{db::db, units::GweiNewtype};
 use async_trait::async_trait;
@@ -9,8 +11,6 @@ use sqlx::{postgres::types::PgInterval, PgExecutor, PgPool};
 use thiserror::Error;
 use tracing::{debug, info};
 use tracing_subscriber::fmt::time;
-use crate::beacon_chain::slots;
-use crate::beacon_chain::slots::Slot;
 
 // insert new records to table beacon_issuance(timestamp, state_root, gwei)
 // which state_root is link to pk in table beacon_states

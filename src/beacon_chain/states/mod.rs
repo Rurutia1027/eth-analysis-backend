@@ -164,7 +164,10 @@ mod tests {
         let mut connection = db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
         store_state(&mut *transaction, "0xtest", Slot(999999)).await;
-        let state_root = get_state_root_by_slot(&mut *transaction, Slot(999999)).await.unwrap();
+        let state_root =
+            get_state_root_by_slot(&mut *transaction, Slot(999999))
+                .await
+                .unwrap();
         assert_eq!(state_root, "0xtest");
     }
 }

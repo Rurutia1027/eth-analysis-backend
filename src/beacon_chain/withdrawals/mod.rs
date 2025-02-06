@@ -27,17 +27,17 @@ pub async fn get_withdrawal_sum_aggregated(
     let parent_withdrawal_sum_aggregated = if block.slot < *SHAPELLA_SLOT {
         GweiNewtype(0)
     } else {
-        blocks::get_withdrawal_sum_from_block_root(executor, &block.parent_root).await
+        blocks::get_withdrawal_sum_from_block_root(executor, &block.parent_root)
+            .await
     };
 
     parent_withdrawal_sum_aggregated + get_withdrawal_sum_from_block(block)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::beacon_chain::{node::Withdrawal, BeaconBlockBuilder};
     use super::*;
+    use crate::beacon_chain::{node::Withdrawal, BeaconBlockBuilder};
 
     #[test]
     fn zero_withdrawals_test() {

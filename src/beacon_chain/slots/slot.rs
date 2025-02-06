@@ -255,5 +255,4 @@ mod tests {
         let slot7 = Slot::GENESIS;
         assert!(slot7.is_first_of_epoch());
     }
-
 }

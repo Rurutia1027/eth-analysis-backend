@@ -115,7 +115,9 @@ mod tests {
         let deposits_sum = get_deposits_sum_by_state_root(
             &mut *transaction,
             &test_header.state_root(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         assert_eq!(GweiNewtype(1), deposits_sum)
     }

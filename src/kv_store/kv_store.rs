@@ -89,7 +89,6 @@ impl KvStore for KVStorePostgres {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
@@ -121,9 +120,10 @@ mod tests {
             "test-key",
             &serde_json::to_value(&test_json).unwrap(),
         )
-            .await;
+        .await;
         let value = get_value(&mut *transaction, "test-key").await.unwrap();
-        let test_json_from_db = serde_json::from_value::<TestJson>(value).unwrap();
+        let test_json_from_db =
+            serde_json::from_value::<TestJson>(value).unwrap();
 
         assert_eq!(test_json_from_db, test_json)
     }
@@ -138,10 +138,11 @@ mod tests {
             "test-key",
             &serde_json::to_value(json!(None::<String>)).unwrap(),
         )
-            .await;
+        .await;
 
         let value = get_value(&mut *transaction, "test-key").await.unwrap();
-        let test_json_from_db = serde_json::from_value::<Option<String>>(value).unwrap();
+        let test_json_from_db =
+            serde_json::from_value::<Option<String>>(value).unwrap();
 
         assert_eq!(test_json_from_db, None)
     }
@@ -157,7 +158,8 @@ mod tests {
         store.set_serializable_value(key, value).await;
 
         // Get the value for the key and deserialize it
-        let retrieved_value: Option<String> = store.get_deserializable_value(key).await;
+        let retrieved_value: Option<String> =
+            store.get_deserializable_value(key).await;
 
         // Assert that the value retrieved is the same as the one set
         assert_eq!(retrieved_value, Some(value.to_owned()));
@@ -170,7 +172,8 @@ mod tests {
 
         // Get the value for a nonexistent key
         let key = "nonexistent_key";
-        let retrieved_value: Option<String> = store.get_deserializable_value(key).await;
+        let retrieved_value: Option<String> =
+            store.get_deserializable_value(key).await;
 
         // Assert that the retrieved value is None
         assert_eq!(retrieved_value, None);
