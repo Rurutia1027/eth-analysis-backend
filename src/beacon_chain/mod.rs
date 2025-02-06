@@ -5,8 +5,8 @@ mod issuance;
 mod node;
 mod slots;
 mod states;
-mod sync;
 mod withdrawals;
+mod syncer;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;

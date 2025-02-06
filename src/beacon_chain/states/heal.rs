@@ -1,6 +1,6 @@
 use crate::{beacon_chain::node::BeaconNode, db, kv_store};
 use crate::{
-    beacon_chain::{self, node::BeaconNodeHttp, sync, Slot},
+    beacon_chain::{self, node::BeaconNodeHttp, Slot},
     job::job_progress::JobProgress,
     kv_store::KVStorePostgres,
 };

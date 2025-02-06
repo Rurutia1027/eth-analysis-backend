@@ -89,12 +89,12 @@ impl Iterator for SlotRangeIntoIterator {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use futures::stream::Iter;
+    use futures::{stream, SinkExt, Stream, StreamExt};
+    use sqlx::PgPool;
     use std::pin::Pin;
     use std::vec::IntoIter;
-    use super::*;
-    use futures::{stream, SinkExt, Stream, StreamExt};
-    use futures::stream::Iter;
-    use sqlx::PgPool;
     use tracing::debug;
 
     #[test]
@@ -107,18 +107,14 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn stream_slots_from_test() {
-        // skip for this commit, and refine the inner logic next commit
-        assert!(true)
-        // let slots_stream = stream_slots_from(Slot(4_300_000)).await;
-        // let slots = slots_stream.take(10).collect::<Vec<Slot>>().await;
-        // assert_eq!(slots.len(), 10);
+        let slots_stream = stream_slots_from(Slot(779000)).await;
+        let slots = slots_stream.take(10).collect::<Vec<Slot>>().await;
+        assert_eq!(slots.len(), 10);
     }
 
     // this function should interact with the db table beacon_states' inner records
     // but to simplicity the logic focus on testing slot range iterators we mock this function here
-    async fn mock_stream_slots(
-        slot: Slot,
-    ) -> Iter<IntoIter<Slot>> {
+    async fn mock_stream_slots(slot: Slot) -> Iter<IntoIter<Slot>> {
         // We will mock a sequence of 5 slots for testing purposes.
         let mock_slots = vec![
             Slot(slot.0 + 1),
@@ -131,7 +127,9 @@ mod tests {
         stream::iter(mock_slots)
     }
 
-    async fn stream_slots_from(gte_slot: Slot) -> Pin<Box<dyn Stream<Item = Slot> + Send>> {
+    async fn stream_slots_from(
+        gte_slot: Slot,
+    ) -> Pin<Box<dyn Stream<Item = Slot> + Send>> {
         debug!("streaming slots from {gte_slot}");
 
         let beacon_node = BeaconNodeHttp::new();
@@ -149,7 +147,8 @@ mod tests {
         // first head from the node to come in. We don't want to wait. So ask for the latest head, take
         // this as the max, and immediately start listening for new heads. Running the small risk the
         // chain has advanced between these two calls.
-        let slots_stream = Box::pin(mock_stream_slots(last_slot_on_start).await);
+        let slots_stream =
+            Box::pin(mock_stream_slots(last_slot_on_start).await);
 
         let slot_range = SlotRange::new(gte_slot, last_slot_on_start);
 
