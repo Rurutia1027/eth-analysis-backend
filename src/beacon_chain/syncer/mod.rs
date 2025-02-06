@@ -1,3 +1,15 @@
+use crate::env::ENV_CONFIG;
+use crate::{
+    beacon_chain::node::{
+        BeaconBlock, BeaconHeaderSignedEnvelope, BeaconNode, BeaconNodeHttp,
+        StateRoot, ValidatorBalance,
+    },
+    beacon_chain::{balances, issuance, slot_from_string, withdrawals, Slot},
+    beacon_chain::{blocks, states},
+    db::db,
+    json_codecs::i32_from_string,
+    performance::TimedExt,
+};
 use anyhow::{anyhow, Result};
 use chrono::Duration;
 use futures::{stream, SinkExt, Stream, StreamExt};
@@ -6,15 +18,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, PgConnection, PgExecutor, PgPool};
 use std::{cmp::Ordering, collections::VecDeque};
 use tracing::{debug, info, warn};
-use crate::env::ENV_CONFIG;
-use crate::{
-    beacon_chain::{withdrawals, balances, issuance, slot_from_string, Slot },
-    beacon_chain::node::{BeaconBlock, BeaconNode, BeaconNodeHttp, StateRoot, ValidatorBalance, BeaconHeaderSignedEnvelope},
-    beacon_chain::{states, blocks},
-    db::db,
-    json_codecs::i32_from_string,
-    performance::TimedExt,
-};
 
 lazy_static! {
     static ref BLOCK_LAG_LIMIT: Duration = Duration::minutes(5);
@@ -43,7 +46,7 @@ async fn gather_sync_data(
         .await?
         .expect("expect state_root to be available for currently syncing slot");
 
-    // state_root: is our db beacon_state's fetched latest/freshest state_root value
+    // state_root: is our db beacon_states' fetched latest/freshest state_root value
     // state_root_check: is beacon api endpoint's fetched latest state_root value
     // if they are not match it means there are some blocks updated and the status of the beacon chain updated
     // it means our local db stored the latest state is not the 'latest'
@@ -108,15 +111,71 @@ async fn gather_sync_data(
     Ok(sync_data)
 }
 
+// calculate two slots (on chain and off chain)'s timestamp lag value
+// attention: before can invoke this function, we need to ensure that two slots are belong to the same state_root value
+async fn get_sync_lag(
+    beacon_node: &BeaconNodeHttp,
+    off_chain_slot: Slot,
+) -> Result<Duration> {
+    let last_on_chain_header = beacon_node.get_last_header().await?;
+    let last_on_chain_slot = last_on_chain_header.header.message.slot;
+    let last_on_chain_slot_ts = last_on_chain_slot.date_time();
+    let off_chain_slot_ts = off_chain_slot.date_time();
+    let lag = last_on_chain_slot_ts - off_chain_slot_ts;
+    Ok(lag)
+}
 
+// this function is also the main entry point of start sync dataset from beacon chain to local
+// todo: this function looks so complicated maybe we can deposit it to make it a little easier to test and extend
+pub async fn sync_slot_by_state_root(
+    db_pool: &PgPool,             // db connection pool
+    beacon_node: &BeaconNodeHttp, // beacon chain htp request handler
+    state_root: &StateRoot,       // local latest state_root value
+    slot: Slot,                   // off chain slot value
+) -> Result<()> {
+    // first we take the off chain slot value send request to beacon chain endpoint
+    // to fetch the lag value between local off chain slot and on chain latest slot value
+    let sync_lag = get_sync_lag(beacon_node, slot).await?;
+    debug!(%sync_lag, "beacon sync lag ");
 
+    let SyncData {
+        header_block_tuple,
+        validator_balances,
+    } = gather_sync_data(beacon_node, state_root, slot, &sync_lag).await?;
 
+    // all data has been fetch and cached in the object of SyncData this object
+    // now we begin the transaction, and break down & extract different parts from SyncData fields
+    // and store the data to beacon associated tables: beacon_states, beacon_blocks, beacon_issuance and beacon_validators_balance
+    // --- begin transaction ---
+    let mut transaction = db_pool.begin().await?;
 
+    // match header_block_tuple {}
 
+    // --- end transaction ---
+    transaction.commit().await?;
 
+    // here we fetch the beacon chain latest state_root value
+    // and compare it with our local state_root value
+    let last_on_chain_state_root = beacon_node
+        .get_last_header()
+        .await?
+        .header
+        .message
+        .state_root;
 
+    if last_on_chain_state_root == *state_root {
+        debug!(
+            "sync caught up with head of chain, updating deferrable analysis"
+        );
+        update_deferrable_analysis(db_pool).await?
+    } else {
+        debug!("sync not yet caught up with head of chain, skipping deferrable analysis")
+    }
 
+    Ok(())
+}
 
-
-
-
+async fn update_deferrable_analysis(db_pool: &PgPool) -> Result<()> {
+    // refresh update cache, but now we haven't implement this yet
+    Ok(())
+}
