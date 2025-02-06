@@ -5,8 +5,8 @@ mod issuance;
 mod node;
 mod states;
 mod sync;
-mod units;
 mod withdrawals;
+mod slots;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
@@ -14,8 +14,7 @@ pub use node::mock_block::{
     BeaconBlockBuilder, BeaconHeaderSignedEnvelopeBuilder,
 };
 use serde::Serialize;
-pub use units::slot_from_string;
-pub use units::Slot;
+pub use slots::{slot_from_string,Slot};
 
 lazy_static! {
     pub static ref GENESIS_TIMESTAMP: DateTime<Utc> =

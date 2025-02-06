@@ -107,7 +107,7 @@ pub async fn get_validator_balances_by_start_of_day(
 }
 
 // function deletes multiple records in beacon_validators_balance table
-// that with each slot value >= given slot value
+// that with each slots value >= given slots value
 // this function should be triggered once the record in the beacon_states is deleted
 pub async fn delete_validator_sums(
     executor: impl PgExecutor<'_>,
@@ -128,9 +128,9 @@ pub async fn delete_validator_sums(
     .unwrap();
 }
 
-// function deletes multiple records in beacon_validators_balance table with the same given slot value
-// however, slot value does not exist in table so we need to first
-// query block_states table by given slot value
+// function deletes multiple records in beacon_validators_balance table with the same given slots value
+// however, slots value does not exist in table so we need to first
+// query block_states table by given slots value
 // then use the queried records' state_root values as a set
 // all records in beacon_validators_balance table with the same state_root value should be removed from the table
 pub async fn delete_validator_sum(executor: impl PgExecutor<'_>, slot: Slot) {

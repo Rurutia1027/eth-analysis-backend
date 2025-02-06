@@ -124,7 +124,7 @@ pub async fn store_block(
 
 // delete all records in beacon_blocks with each beacon_blocks#state_root value
 // locates in the range of the set that constructed by query results
-// from querying from table beacon_states with beacon_state#slot >= given slot value
+// from querying from table beacon_states with beacon_state#slots >= given slots value
 pub async fn delete_blocks(executor: impl PgExecutor<'_>, greater_than_or_equal: Slot) {
     sqlx::query!(
         "
@@ -145,7 +145,7 @@ pub async fn delete_blocks(executor: impl PgExecutor<'_>, greater_than_or_equal:
 }
 
 // delete single block with state_root locates in the query result
-// that it's query result from query table beacon_states value slot value equal to query parameter
+// that it's query result from query table beacon_states value slots value equal to query parameter
 pub async fn delete_block(executor: impl PgExecutor<'_>, slot: Slot) {
     sqlx::query(
         "
@@ -155,7 +155,7 @@ pub async fn delete_block(executor: impl PgExecutor<'_>, slot: Slot) {
                 state_root
             FROM
                 beacon_states
-            WHERE slot = $1
+            WHERE slots = $1
         )
         ",
     )
@@ -198,7 +198,7 @@ impl From<BlockDbRow> for DbBlock {
     }
 }
 
-// get a series of blocks which each slot value <= given query slot value
+// get a series of blocks which each slots value <= given query slots value
 pub async fn get_block_before_slot(
     executor: impl PgExecutor<'_>,
     less_than: Slot,
@@ -400,11 +400,11 @@ mod tests {
         assert!(true)
     }
 
-    // this beacon_blocks table record deletion by slot value associates with two table
-    // the anchor table: beacon_states stores the state_root and slot value
+    // this beacon_blocks table record deletion by slots value associates with two table
+    // the anchor table: beacon_states stores the state_root and slots value
     // the beacon_blocks table which takes state_root as its primary key
     // deletion is separated two steps:
-    // 1. query anchor table -- beacon_states by given slot value, and get its state_root
+    // 1. query anchor table -- beacon_states by given slots value, and get its state_root
     // 2. then take the `state_root` value that queried from beacon_states and invoke delete operation in table beacon_blocks
 
     // so in this test case, we need first insert a record to beacon_states table

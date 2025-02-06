@@ -43,7 +43,7 @@ impl Slot {
         }
     }
 
-    /// Returns the most recent slot before the given date_time
+    /// Returns the most recent slots before the given date_time
     pub fn from_date_time_rounded_down(date_time: &DateTime<Utc>) -> Self {
         let diff_seconds = *date_time - *GENESIS_TIMESTAMP;
         let slot = diff_seconds.num_seconds() / Slot::SECONDS_PER_SLOT as i64;
@@ -176,7 +176,7 @@ where
     D: Deserializer<'de>,
 {
     String::deserialize(deserializer)
-        .map(|slot_text| slot_text.parse().expect("expect slot to be i32"))
+        .map(|slot_text| slot_text.parse().expect("expect slots to be i32"))
         .map(Slot)
 }
 

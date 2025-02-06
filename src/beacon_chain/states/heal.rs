@@ -8,7 +8,7 @@ use pit_wall::Progress;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-// The first slot we have stored
+// The first slots we have stored
 const FIRST_SHARED_ETH_SUPPLY_SLOT: Slot = Slot(0);
 
 const HEAL_BEACON_STATES_KEY: &str = "heal-beacon-states";
@@ -36,7 +36,7 @@ pub async fn heal_beacon_states() {
     // here we take the first and last range with step length = 1000
     // query the beacon_states table
     // converted the values into the hash map with
-    // key = slot value
+    // key = slots value
     // value = state_root  -- beacon block hash value
     for chunk in slots.chunks(10000) {
         let first = chunk.first().unwrap();
@@ -65,7 +65,7 @@ pub async fn heal_beacon_states() {
         .map(|row| (row.slot, row.state_root))
         .collect::<HashMap<i32, String>>();
 
-        // traverse each slot value in the slot range [first, last]
+        // traverse each slots value in the slots range [first, last]
         for slot in *first..=*last {
             let stored_state_root = stored_states.get(&slot).unwrap();
 
@@ -86,7 +86,7 @@ pub async fn heal_beacon_states() {
                     "state root mismatch, rolling back stored and re-syncing"
                 );
                 todo!("add sync rollback and sync slot here ");
-                info!(%slot, "healed state at slot");
+                info!(%slot, "healed state at slots");
             }
 
             progress.inc_work_done();

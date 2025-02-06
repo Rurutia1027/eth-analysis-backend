@@ -1,6 +1,6 @@
 pub mod heal;
 
-use super::Slot;
+use super::slots::Slot;
 pub use heal::heal_beacon_states;
 use sqlx::PgExecutor;
 

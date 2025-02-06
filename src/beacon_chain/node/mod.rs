@@ -3,7 +3,7 @@
 ///! They should be updated to do so.
 pub mod mock_block;
 
-use super::{slot_from_string, Slot};
+use super::{slots::slot_from_string, slots::Slot};
 use crate::{
     env::ENV_CONFIG, execution_chain::BlockHash, json_codecs::i32_from_string,
     performance::TimedExt, units::GweiNewtype,
@@ -455,7 +455,7 @@ impl BeaconNode for BeaconNodeHttp {
             }
             status => {
                 Err(anyhow!(
-                "failed to fetch state_root by slot. slot={} status={} url={}",
+                "failed to fetch state_root by slots. slots={} status={} url={}",
                 slot, status, res.url()
             ))
             }
@@ -518,7 +518,7 @@ impl BeaconNode for BeaconNodeHttp {
         let slot_timestamp = slot.date_time();
         if slot_timestamp > Utc::now() {
             return Err(anyhow!(
-                "tried to fetch slot: {}, with expected timestamp: {}, \
+                "tried to fetch slots: {}, with expected timestamp: {}, \
                 but can't fetch slots from the future",
                 slot,
                 slot_timestamp
@@ -538,7 +538,7 @@ impl BeaconNode for BeaconNodeHttp {
             .await
     }
 
-    /// Convenience fn that really gets the header by slot,
+    /// Convenience fn that really gets the header by slots,
     /// but checks for us the state_root is as expected.
     #[allow(dead_code)]
     async fn get_header_by_state_root(
