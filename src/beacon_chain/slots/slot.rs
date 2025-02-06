@@ -176,7 +176,7 @@ where
     D: Deserializer<'de>,
 {
     String::deserialize(deserializer)
-        .map(|slot_text| slot_text.parse().expect("expect slot to be i32"))
+        .map(|slot_text| slot_text.parse().expect("expect slots to be i32"))
         .map(Slot)
 }
 
@@ -255,5 +255,4 @@ mod tests {
         let slot7 = Slot::GENESIS;
         assert!(slot7.is_first_of_epoch());
     }
-
 }

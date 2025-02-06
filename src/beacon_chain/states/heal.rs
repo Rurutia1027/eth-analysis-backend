@@ -1,6 +1,6 @@
 use crate::{beacon_chain::node::BeaconNode, db, kv_store};
 use crate::{
-    beacon_chain::{self, node::BeaconNodeHttp, sync, Slot},
+    beacon_chain::{self, node::BeaconNodeHttp, Slot},
     job::job_progress::JobProgress,
     kv_store::KVStorePostgres,
 };
@@ -65,7 +65,7 @@ pub async fn heal_beacon_states() {
         .map(|row| (row.slot, row.state_root))
         .collect::<HashMap<i32, String>>();
 
-        // traverse each slot value in the slot range [first, last]
+        // traverse each slot value in the slots range [first, last]
         for slot in *first..=*last {
             let stored_state_root = stored_states.get(&slot).unwrap();
 
@@ -86,7 +86,7 @@ pub async fn heal_beacon_states() {
                     "state root mismatch, rolling back stored and re-syncing"
                 );
                 todo!("add sync rollback and sync slot here ");
-                info!(%slot, "healed state at slot");
+                info!(%slot, "healed state at slots");
             }
 
             progress.inc_work_done();

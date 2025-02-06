@@ -15,7 +15,10 @@ mod tests {
 
     use super::*;
 
-    fn string_from_i32<S>(num_i32: &i32, serializer: S) -> Result<S::Ok, S::Error>
+    fn string_from_i32<S>(
+        num_i32: &i32,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -50,7 +53,7 @@ mod tests {
             name: "alex".to_string(),
             age: 29,
         })
-            .unwrap();
+        .unwrap();
         assert_eq!(actual, expected);
     }
 }

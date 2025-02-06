@@ -1,5 +1,6 @@
-use super::{BeaconNode, Slot};
+use super::BeaconNode;
 use crate::beacon_chain::node::StateRoot;
+use crate::beacon_chain::slots::Slot;
 use crate::units::{GweiImprecise, GweiNewtype};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

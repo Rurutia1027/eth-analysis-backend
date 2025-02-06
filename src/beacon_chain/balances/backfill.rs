@@ -1,5 +1,5 @@
 use crate::beacon_chain::{
-    balances, node::BeaconNode, node::BeaconNodeHttp, Slot,
+    balances, node::BeaconNode, node::BeaconNodeHttp, slots::Slot,
 };
 use futures::{pin_mut, StreamExt};
 use pit_wall::Progress;
@@ -23,7 +23,7 @@ pub enum Granularity {
 // then use the results' state_root join table beacon_validators_balance fields
 // to filter the records in beacon_validators_balance that satisfy the query conditon
 // then use the COUNT() function to get the slots count value
-// finally, converted the slots count into the units by the given Granularity{slot, day, hour or epoch}
+// finally, converted the slots count into the units by the given Granularity{slots, day, hour or epoch}
 // based on the beacon definition: 1 slot = 12 seconds, 32 slots = 1 epoch
 async fn estimate_work_todo(
     db_pool: &PgPool,
@@ -45,10 +45,10 @@ async fn estimate_work_todo(
         ",
         from.0
     )
-        .fetch_one(db_pool)
-        .await
-        .unwrap()
-        .count;
+    .fetch_one(db_pool)
+    .await
+    .unwrap()
+    .count;
 
     match granularity {
         Granularity::Slot => slots_count,
@@ -64,8 +64,8 @@ async fn estimate_work_todo(
         // how many days passed ? 1 slot = 12 seconds, 1 day = 24 * 60 * 3600s / 12s = 7200 slots
         Granularity::Day => slots_count / 7200,
     }
-        .try_into()
-        .unwrap()
+    .try_into()
+    .unwrap()
 }
 
 // this function is designed and implemented for
@@ -109,7 +109,7 @@ pub async fn backfill_balances(
         ",
         from.0,
     )
-        .fetch(db_pool);
+    .fetch(db_pool);
 
     // there should be multiple duplicated records selected from the table
     // , and we only keep the first one by the given query granilarity unit
@@ -186,7 +186,13 @@ pub async fn backfill_balances(
 
         // here we 'backfill' the final result back to the database table
         // this balances_sum is store in the table of beacon_validators_balance
-        balances::store_validators_balance(db_pool, &state_root, slot.into(), &balance_sum).await;
+        balances::store_validators_balance(
+            db_pool,
+            &state_root,
+            slot.into(),
+            &balance_sum,
+        )
+        .await;
 
         // do not forget inc the finish percentage of the progress
         progress.inc_work_done();

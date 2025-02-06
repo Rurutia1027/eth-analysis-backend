@@ -3,19 +3,21 @@ mod blocks;
 mod deposits;
 mod issuance;
 mod node;
+mod slots;
 mod states;
-mod sync;
-mod units;
+mod syncer;
 mod withdrawals;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use serde::Serialize;
+
 pub use node::mock_block::{
     BeaconBlockBuilder, BeaconHeaderSignedEnvelopeBuilder,
 };
-use serde::Serialize;
-pub use units::slot_from_string;
-pub use units::Slot;
+
+pub use node::mock_beacon_node::MockBeaconHttpNode;
+pub use slots::{slot_from_string, Slot};
 
 lazy_static! {
     pub static ref GENESIS_TIMESTAMP: DateTime<Utc> =
@@ -49,12 +51,17 @@ pub mod tests {
         BeaconBlock, BeaconHeaderSignedEnvelope,
     };
     use crate::beacon_chain::states::store_state;
+    use crate::beacon_chain::Slot;
     use crate::units::GweiNewtype;
     use sqlx::{Acquire, PgConnection};
-    use crate::beacon_chain::Slot;
 
-    pub async fn store_test_block(executor: &mut PgConnection, test_id: &str, slot: Slot) {
-        let header = BeaconHeaderSignedEnvelopeBuilder::new(test_id, slot).build();
+    pub async fn store_test_block(
+        executor: &mut PgConnection,
+        test_id: &str,
+        slot: Slot,
+    ) {
+        let header =
+            BeaconHeaderSignedEnvelopeBuilder::new(test_id, slot).build();
         let block = Into::<BeaconBlockBuilder>::into(&header).build();
         store_custom_test_block(executor, &header, &block).await
     }

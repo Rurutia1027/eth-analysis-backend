@@ -31,12 +31,12 @@ pub async fn get_db_connection(name: &str) -> PgConnection {
 
 #[cfg(test)]
 pub mod tests {
+    use super::*;
     use async_trait::async_trait;
     use nanoid::nanoid;
     use sqlx::postgres::PgPoolOptions;
     use test_context::AsyncTestContext;
     use tracing::info;
-    use super::*;
 
     const ALPHABET: [char; 16] = [
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 'b', 'c', 'd',
@@ -67,7 +67,9 @@ pub mod tests {
             let name = format!("testdb_{}", nanoid!(15, &ALPHABET));
 
             let mut connection = get_test_db_connection().await;
-            println!("create test database for testing with the db name as {name}");
+            println!(
+                "create test database for testing with the db name as {name}"
+            );
             sqlx::query(&format!("CREATE DATABASE {name}"))
                 .execute(&mut connection)
                 .await

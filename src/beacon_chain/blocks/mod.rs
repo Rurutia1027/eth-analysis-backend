@@ -125,7 +125,10 @@ pub async fn store_block(
 // delete all records in beacon_blocks with each beacon_blocks#state_root value
 // locates in the range of the set that constructed by query results
 // from querying from table beacon_states with beacon_state#slot >= given slot value
-pub async fn delete_blocks(executor: impl PgExecutor<'_>, greater_than_or_equal: Slot) {
+pub async fn delete_blocks(
+    executor: impl PgExecutor<'_>,
+    greater_than_or_equal: Slot,
+) {
     sqlx::query!(
         "
         DELETE FROM beacon_blocks
@@ -139,9 +142,9 @@ pub async fn delete_blocks(executor: impl PgExecutor<'_>, greater_than_or_equal:
         ",
         greater_than_or_equal.0
     )
-        .execute(executor)
-        .await
-        .unwrap();
+    .execute(executor)
+    .await
+    .unwrap();
 }
 
 // delete single block with state_root locates in the query result
@@ -155,7 +158,7 @@ pub async fn delete_block(executor: impl PgExecutor<'_>, slot: Slot) {
                 state_root
             FROM
                 beacon_states
-            WHERE slot = $1
+            WHERE slots = $1
         )
         ",
     )
@@ -198,7 +201,7 @@ impl From<BlockDbRow> for DbBlock {
     }
 }
 
-// get a series of blocks which each slot value <= given query slot value
+// get a series of blocks which each slot value <= given query slots value
 pub async fn get_block_before_slot(
     executor: impl PgExecutor<'_>,
     less_than: Slot,
@@ -286,6 +289,7 @@ mod tests {
 
     use super::*;
     use crate::beacon_chain::states::{get_last_state, store_state};
+    use crate::beacon_chain::tests::store_test_block;
     use crate::{
         beacon_chain::node::{
             BeaconBlockBody, BeaconHeader, BeaconHeaderEnvelope, BeaconNode,
@@ -293,7 +297,6 @@ mod tests {
         },
         db,
     };
-    use crate::beacon_chain::tests::store_test_block;
 
     pub async fn get_last_block_slot(
         executor: impl PgExecutor<'_>,
@@ -409,14 +412,15 @@ mod tests {
 
     // so in this test case, we need first insert a record to beacon_states table
     // and take the inserted beacon_states#state_root value to build a beacon_blocks reacord and insert to table beacon_blocks.
-    // then during test, it will executed the operations as expected.
+    // then during test, it will be executed the operations as expected.
     // #[tokio::test]
     #[tokio::test]
     async fn delete_block_test() {
         let mut connection = db::db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
 
-        store_test_block(&mut transaction, "delete_block_test", Slot(233)).await;
+        store_test_block(&mut transaction, "delete_block_test", Slot(233))
+            .await;
 
         let block_slot = get_last_block_slot(&mut *transaction).await;
         assert_eq!(block_slot, Some(Slot(233)));

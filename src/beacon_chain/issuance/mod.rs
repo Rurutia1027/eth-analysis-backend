@@ -1,5 +1,6 @@
-use super::Slot;
 use crate::beacon_chain::node::Withdrawal;
+use crate::beacon_chain::slots;
+use crate::beacon_chain::slots::Slot;
 use crate::beacon_chain::states::get_last_state;
 use crate::{db::db, units::GweiNewtype};
 use async_trait::async_trait;
@@ -68,7 +69,7 @@ pub async fn get_current_issuance(
 }
 
 // delete multiple records in beacon_issuance which join to beacon_state's slot values is >= given slot value
-// slot only exists in table beacon_states table, so we need first query matching records
+// field slot only exists in table beacon_states table, so we need first query matching records
 // in table beacon_states by given slot value
 // then create sets based on the queried records' state_root value as the STATE_ROOT_SET
 // then query records from table beacon_issuance with state_root field value locates in the STATE_ROOT_SET
@@ -269,7 +270,7 @@ pub async fn update_issuance_estimate() {
     // get how many issuances in gwei per slot
     let issuance_per_slot_gwei =
         get_issuance_per_slot_estimate(&issuance_store).await;
-    debug!("issuance per slot estimate: {}", issuance_per_slot_gwei);
+    debug!("issuance per slots estimate: {}", issuance_per_slot_gwei);
 
     // here we get the freshest/latest state_root from the beacon_states table
     let slot = get_last_state(&db_pool)
