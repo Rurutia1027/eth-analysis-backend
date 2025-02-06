@@ -2,6 +2,7 @@
 ///! Currently, many calls taking a state_root as input do not acknowledge that a state_root may disappear at any time.
 ///! They should be updated to do so.
 pub mod mock_block;
+pub mod mock_beacon_node;
 
 use super::{slots::slot_from_string, slots::Slot};
 use crate::{

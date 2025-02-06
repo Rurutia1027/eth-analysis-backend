@@ -5,15 +5,18 @@ mod issuance;
 mod node;
 mod slots;
 mod states;
-mod withdrawals;
 mod syncer;
+mod withdrawals;
 
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use serde::Serialize;
+
 pub use node::mock_block::{
     BeaconBlockBuilder, BeaconHeaderSignedEnvelopeBuilder,
 };
-use serde::Serialize;
+
+pub use node::mock_beacon_node::MockBeaconHttpNode;
 pub use slots::{slot_from_string, Slot};
 
 lazy_static! {

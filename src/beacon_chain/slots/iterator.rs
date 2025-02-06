@@ -96,6 +96,7 @@ mod tests {
     use std::pin::Pin;
     use std::vec::IntoIter;
     use tracing::debug;
+    use crate::beacon_chain::MockBeaconHttpNode;
 
     #[test]
     fn slot_range_iterable_test() {
@@ -107,7 +108,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn stream_slots_from_test() {
-        let slots_stream = stream_slots_from(Slot(779000)).await;
+        let slots_stream = stream_slots_from(Slot(759000)).await;
         let slots = slots_stream.take(10).collect::<Vec<Slot>>().await;
         assert_eq!(slots.len(), 10);
     }
@@ -122,6 +123,11 @@ mod tests {
             Slot(slot.0 + 3),
             Slot(slot.0 + 4),
             Slot(slot.0 + 5),
+            Slot(slot.0 + 6),
+            Slot(slot.0 + 7),
+            Slot(slot.0 + 8),
+            Slot(slot.0 + 9),
+            Slot(slot.0 + 10),
         ];
 
         stream::iter(mock_slots)
@@ -132,7 +138,7 @@ mod tests {
     ) -> Pin<Box<dyn Stream<Item = Slot> + Send>> {
         debug!("streaming slots from {gte_slot}");
 
-        let beacon_node = BeaconNodeHttp::new();
+        let beacon_node = MockBeaconHttpNode::new();
         let last_slot_on_start = beacon_node
             .get_last_header()
             .await
