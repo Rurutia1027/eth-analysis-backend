@@ -538,7 +538,7 @@ impl BeaconNode for BeaconNodeHttp {
             .await
     }
 
-    /// Convenience fn that really gets the header by slots,
+    /// Convenience fn that really gets the header by slot,
     /// but checks for us the state_root is as expected.
     #[allow(dead_code)]
     async fn get_header_by_state_root(

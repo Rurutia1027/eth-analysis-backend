@@ -68,7 +68,7 @@ pub async fn get_current_issuance(
     .unwrap()
 }
 
-// delete multiple records in beacon_issuance which join to beacon_state's slots values is >= given slots value
+// delete multiple records in beacon_issuance which join to beacon_state's slot values is >= given slot value
 // slots only exists in table beacon_states table, so we need first query matching records
 // in table beacon_states by given slots value
 // then create sets based on the queried records' state_root value as the STATE_ROOT_SET
@@ -92,7 +92,7 @@ pub async fn delete_issuances(
     .unwrap();
 }
 
-// delete records in beacon_issuance table by match with only one slots value
+// delete records in beacon_issuance table by match with only one slot value
 pub async fn delete_issuance(executor: impl PgExecutor<'_>, slot: Slot) {
     sqlx::query!(
         "
@@ -267,7 +267,7 @@ pub async fn update_issuance_estimate() {
     let db_pool = db::get_db_pool("update-issuance-estimate", 3).await;
     let issuance_store = IssuanceStoragePostgres::new(db_pool.clone());
 
-    // get how many issuances in gwei per slots
+    // get how many issuances in gwei per slot
     let issuance_per_slot_gwei =
         get_issuance_per_slot_estimate(&issuance_store).await;
     debug!("issuance per slots estimate: {}", issuance_per_slot_gwei);
@@ -284,7 +284,7 @@ pub async fn update_issuance_estimate() {
     let timestamp = slot.date_time();
 
     // create instance of struct IssuanceEstimate value by passing the values of
-    // slots value, latest beacon_state's ts, and the estimateed issuance per slots value in the unit of Gwei
+    // slot value, latest beacon_state's ts, and the estimateed issuance per slot value in the unit of Gwei
     let issuance_estimate = IssuanceEstimate {
         slot,
         timestamp,

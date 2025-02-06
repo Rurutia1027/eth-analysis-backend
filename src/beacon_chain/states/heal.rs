@@ -8,7 +8,7 @@ use pit_wall::Progress;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-// The first slots we have stored
+// The first slot we have stored
 const FIRST_SHARED_ETH_SUPPLY_SLOT: Slot = Slot(0);
 
 const HEAL_BEACON_STATES_KEY: &str = "heal-beacon-states";
@@ -36,7 +36,7 @@ pub async fn heal_beacon_states() {
     // here we take the first and last range with step length = 1000
     // query the beacon_states table
     // converted the values into the hash map with
-    // key = slots value
+    // key = slot value
     // value = state_root  -- beacon block hash value
     for chunk in slots.chunks(10000) {
         let first = chunk.first().unwrap();
@@ -65,7 +65,7 @@ pub async fn heal_beacon_states() {
         .map(|row| (row.slot, row.state_root))
         .collect::<HashMap<i32, String>>();
 
-        // traverse each slots value in the slots range [first, last]
+        // traverse each slot value in the slots range [first, last]
         for slot in *first..=*last {
             let stored_state_root = stored_states.get(&slot).unwrap();
 

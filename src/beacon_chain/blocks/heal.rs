@@ -18,7 +18,7 @@ pub async fn heal_block_hashes() {
     let kv_store = kv_store::KVStorePostgres::new(db_pool.clone());
     let job_tracker = JobProgress::new(HEAL_BLOCK_HASHES_KEY, &kv_store);
     let beacon_node = BeaconNodeHttp::new();
-    // fetch the first slots value from job tracker, if fetch nothing use FIRST_POST_MERGE_SLOT instead
+    // fetch the first slot value from job tracker, if fetch nothing use FIRST_POST_MERGE_SLOT instead
     let first_slot = job_tracker.get().await.unwrap_or(FIRST_POST_MERGE_SLOT);
 
     let work_todo = sqlx::query!(
@@ -64,7 +64,7 @@ pub async fn heal_block_hashes() {
     .fetch(&db_pool);
     /**
         `work_todo` is a query that counts how many rows in the `beacon_blocks` table need to be processed.
-        specifically where `block_hash` is NULL and the `slots` is greater than or equal to `first_slot.0`.
+        specifically where `block_hash` is NULL and the `slot` is greater than or equal to `first_slot.0`.
         This count is used to track the total number of blocks that require "healing"(i.e., updating the block hash).
         We use this count to initialize the progress tracker, ensuring the healing process can report progress as it
         processes each block.

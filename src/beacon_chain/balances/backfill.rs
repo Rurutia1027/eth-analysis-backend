@@ -17,9 +17,9 @@ pub enum Granularity {
 }
 
 // this function finds how many records there are in table beacon_validators_balance table with state_root == NULL
-// , and also it's associated slots value should be equal to the given slots
+// , and also it's associated slot value should be equal to the given slot
 // however there is no field in beacon_states that's the reason why we need to use left join
-// first query slots from beacon_states table, and get results
+// first query slot from beacon_states table, and get results
 // then use the results' state_root join table beacon_validators_balance fields
 // to filter the records in beacon_validators_balance that satisfy the query conditon
 // then use the COUNT() function to get the slots count value
@@ -53,15 +53,15 @@ async fn estimate_work_todo(
     match granularity {
         Granularity::Slot => slots_count,
         // treat an epoch as a window in the stream, each window contains 32 slots
-        // and each slots can be treated as a step with 12s in the steam
+        // and each slot can be treated as a step with 12s in the steam
 
         //// how many epochs, 32 slots = 1 epoch
         Granularity::Epoch => slots_count * SLOTS_PER_EPOCH,
 
-        // how many hours passed ? 1 slots = 12 second, 1 hour = 3600s / 12s = 300 slots
+        // how many hours passed ? 1 slot = 12 second, 1 hour = 3600s / 12s = 300 slots
         Granularity::Hour => slots_count / 300,
 
-        // how many days passed ? 1 slots = 12 seconds, 1 day = 24 * 60 * 3600s / 12s = 7200 slots
+        // how many days passed ? 1 slot = 12 seconds, 1 day = 24 * 60 * 3600s / 12s = 7200 slots
         Granularity::Day => slots_count / 7200,
     }
     .try_into()
@@ -87,7 +87,7 @@ pub async fn backfill_balances(
     let beacon_node = BeaconNodeHttp::new();
 
     // invoke estimate_work_todo to get the exactly number of the slots by providing
-    // the unit of the garnularity{day, hour, slots, or epoch} and start slots value
+    // the unit of the garnularity{day, hour, slot, or epoch} and start slot value
     let work_todo = estimate_work_todo(db_pool, granularity, from).await;
 
     // setup a progress instance and assign the specific progress name to it
@@ -197,7 +197,7 @@ pub async fn backfill_balances(
         // do not forget inc the finish percentage of the progress
         progress.inc_work_done();
 
-        // print the progress of the given block state_root, and slots's balance aggregated value is finished
+        // print the progress of the given block state_root, and slot's balance aggregated value is finished
         info!("{}", progress.get_progress_string());
     }
 }
