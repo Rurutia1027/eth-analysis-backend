@@ -403,7 +403,7 @@ mod tests {
         assert!(true)
     }
 
-    // this beacon_blocks table record deletion by slots value associates with two table
+    // this beacon_blocks table record deletion by slot value associates with two table
     // the anchor table: beacon_states stores the state_root and slot value
     // the beacon_blocks table which takes state_root as its primary key
     // deletion is separated two steps:
@@ -412,7 +412,7 @@ mod tests {
 
     // so in this test case, we need first insert a record to beacon_states table
     // and take the inserted beacon_states#state_root value to build a beacon_blocks reacord and insert to table beacon_blocks.
-    // then during test, it will executed the operations as expected.
+    // then during test, it will be executed the operations as expected.
     // #[tokio::test]
     #[tokio::test]
     async fn delete_block_test() {

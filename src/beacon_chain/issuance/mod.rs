@@ -69,8 +69,8 @@ pub async fn get_current_issuance(
 }
 
 // delete multiple records in beacon_issuance which join to beacon_state's slot values is >= given slot value
-// slots only exists in table beacon_states table, so we need first query matching records
-// in table beacon_states by given slots value
+// field slot only exists in table beacon_states table, so we need first query matching records
+// in table beacon_states by given slot value
 // then create sets based on the queried records' state_root value as the STATE_ROOT_SET
 // then query records from table beacon_issuance with state_root field value locates in the STATE_ROOT_SET
 pub async fn delete_issuances(

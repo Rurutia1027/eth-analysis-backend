@@ -24,7 +24,7 @@ pub enum Granularity {
 // to filter the records in beacon_validators_balance that satisfy the query conditon
 // then use the COUNT() function to get the slots count value
 // finally, converted the slots count into the units by the given Granularity{slots, day, hour or epoch}
-// based on the beacon definition: 1 slots = 12 seconds, 32 slots = 1 epoch
+// based on the beacon definition: 1 slot = 12 seconds, 32 slots = 1 epoch
 async fn estimate_work_todo(
     db_pool: &PgPool,
     granularity: &Granularity,
