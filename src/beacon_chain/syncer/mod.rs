@@ -1,3 +1,4 @@
+use crate::beacon_chain::deposits;
 use crate::env::ENV_CONFIG;
 use crate::{
     beacon_chain::node::{
@@ -149,7 +150,110 @@ pub async fn sync_slot_by_state_root(
     // --- begin transaction ---
     let mut transaction = db_pool.begin().await?;
 
-    // match header_block_tuple {}
+    match header_block_tuple {
+        None => {
+            debug!(
+                "storing slot without block, slot: {:?}, state_root: {}",
+                slot, state_root
+            );
+            states::store_state(&mut *transaction, state_root, slot)
+                .timed("store state without block")
+                .await;
+        }
+        Some((ref header, ref block)) => {
+            // calculate block's total input aggregated value,
+            // first fetch block's parent aggregated sum value
+            // then traverse each record in current block accumulate each record's value then return
+            let deposit_sum_aggregated =
+                deposits::get_deposit_sum_aggregated(&mut *transaction, block)
+                    .await;
+
+            // calculate block's total output aggregated values,
+            // first fetch block's parent aggregated sum value,
+            // then traverse each record in current block accumulate each record's value then return
+            let withdrawal_sum_aggregated =
+                withdrawals::get_withdrawal_sum_aggregated(
+                    &mut *transaction,
+                    block,
+                )
+                .await;
+
+            debug!(%slot, state_root, block_root = header.root, "storing slot with block");
+
+            // find current block's parent_root (parent hash value)
+            // from table beacon_blocks
+            let is_parent_known = blocks::get_is_hash_known(
+                &mut *transaction,
+                &header.parent_root(),
+            )
+            .await;
+
+            // if current block's parent block hash not exist in local table
+            // throw error message
+            if !is_parent_known {
+                return Err(anyhow!(
+            "trying to insert beacon block with missing parent, block_root: {}, parent_root: {:?}",
+            header.root,
+            header.header.message.parent_root
+        ));
+            }
+
+            // save on beacon chain fetched state_root(latest) and slot value to beacon_states table
+            states::store_state(
+                &mut *transaction,
+                &header.state_root(),
+                header.slot(),
+            )
+            .await;
+
+            // after the on chain state_root value this anchor is saved, we continue store on chain fetched beacon block
+            blocks::store_block(
+                &mut *transaction,
+                block,
+                // invoke deposits function to calculate each deposit record deposit amount in current block
+                &deposits::get_deposit_sum_from_block(block),
+                &deposit_sum_aggregated, // current block deposits' amount + block's parent deposit aggregated sum
+                // invoke withdrawals inner defined functions to calculate each withdrawal amount in current block
+                &withdrawals::get_withdrawal_sum_from_block(block),
+                &withdrawal_sum_aggregated, // current block withdrawals' amount + block's parent withdrawals aggregated sum
+                header,
+            )
+            .await;
+        }
+    }
+
+    // after finish store beacon_states and beacon_blocks
+    // we continue with storing validator_balances value to corresponding beacon table
+    // only pattern match will store operation allowed
+    if let Some(ref validator_balances) = validator_balances {
+        debug!("validator balances present");
+        let validator_balances_sum = balances::sum_validator_balances(validator_balances);
+        balances::store_validators_balance(
+            &mut *transaction,
+            state_root,
+            slot,
+            &validator_balances_sum,
+        ).await;
+
+        if let Some((_, block)) = header_block_tuple {
+            let deposit_sum_aggregated = deposits::get_deposit_sum_aggregated(&mut *transaction, &block).await;
+            let withdrawal_sum_aggregated = withdrawals::get_withdrawal_sum_aggregated(&mut *transaction, &block).await;
+
+            issuance::store_issuance(
+                &mut *transaction,
+                state_root,
+                slot,
+                &issuance::calc_issuance(
+                    &validator_balances_sum,
+                    &withdrawal_sum_aggregated,
+                    &deposit_sum_aggregated,
+                )
+            ).await;
+        }
+
+        // todo! update the latest slot value to db table , but this haven't finish yet
+        // leave a todo here
+    }
 
     // --- end transaction ---
     transaction.commit().await?;
@@ -176,6 +280,6 @@ pub async fn sync_slot_by_state_root(
 }
 
 async fn update_deferrable_analysis(db_pool: &PgPool) -> Result<()> {
-    // refresh update cache, but now we haven't implement this yet
+    // todo : refresh update cache, but now we haven't implement this yet
     Ok(())
 }
