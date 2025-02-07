@@ -548,3 +548,10 @@ async fn find_last_matching_slot(
     );
     Ok(candidate_slot)
 }
+
+pub async fn sync_beacon_states() -> Result<()> {
+    info!("syncing beacon states");
+
+    // todo: finish this in next commit
+    Ok(())
+}
