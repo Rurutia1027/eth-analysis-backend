@@ -30,12 +30,14 @@ struct SyncData {
     validator_balances: Option<Vec<ValidatorBalance>>,
 }
 
+// Slot in the Ethereum Beacon Chain is a globally unique, monotonically increasing number.
+// It does not reset when the state_root changes. Even if the beacon chain state updates,
+// the slot count continues to increment without restarting from zero.
 // sync_lag: calculated from the slot,
 // local latest state_root slot as the start_slot
 // fetch from beacon api endpoint via the same state_root as the end_slot
-// cause slot is approximate 12 s
-// based on the start_slot and end_slot value under the same state_root value
-// we can calculate the `lag` between local and remote beacon chain
+// cause slot is approximate 12 s , we can calculate the `lag` between local and remote beacon chain
+// slot is beacon chain global unique increase value, and this value will not be reset when state root modifies
 async fn gather_sync_data(
     beacon_node: &BeaconNodeHttp,
     state_root: &StateRoot,
