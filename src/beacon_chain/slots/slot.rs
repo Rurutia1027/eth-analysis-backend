@@ -23,6 +23,9 @@ use std::{
 #[sqlx(transparent)]
 pub struct Slot(pub i32);
 
+// ATTENTION: Slot in the Ethereum Beacon Chain is a globally unique, monotonically increasing number.
+// It does not reset when the state_root changes. Even if the beacon chain state updates,
+// the slot count continues to increment without restarting from zero.
 impl Slot {
     pub const GENESIS: Self = Self(0);
     pub const SECONDS_PER_SLOT: i32 = 12;

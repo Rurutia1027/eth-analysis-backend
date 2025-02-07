@@ -1,4 +1,5 @@
 use crate::beacon_chain::deposits;
+use crate::beacon_chain::slots::SlotRange;
 use crate::env::ENV_CONFIG;
 use crate::{
     beacon_chain::node::{
@@ -29,12 +30,14 @@ struct SyncData {
     validator_balances: Option<Vec<ValidatorBalance>>,
 }
 
+// Slot in the Ethereum Beacon Chain is a globally unique, monotonically increasing number.
+// It does not reset when the state_root changes. Even if the beacon chain state updates,
+// the slot count continues to increment without restarting from zero.
 // sync_lag: calculated from the slot,
 // local latest state_root slot as the start_slot
 // fetch from beacon api endpoint via the same state_root as the end_slot
-// cause slot is approximate 12 s
-// based on the start_slot and end_slot value under the same state_root value
-// we can calculate the `lag` between local and remote beacon chain
+// cause slot is approximate 12 s , we can calculate the `lag` between local and remote beacon chain
+// slot is beacon chain global unique increase value, and this value will not be reset when state root modifies
 async fn gather_sync_data(
     beacon_node: &BeaconNodeHttp,
     state_root: &StateRoot,
@@ -137,7 +140,6 @@ pub async fn sync_slot_by_state_root(
     // first we take the off chain slot value send request to beacon chain endpoint
     // to fetch the lag value between local off chain slot and on chain latest slot value
     let sync_lag = get_sync_lag(beacon_node, slot).await?;
-    debug!(%sync_lag, "beacon sync lag ");
 
     let SyncData {
         header_block_tuple,
@@ -177,8 +179,6 @@ pub async fn sync_slot_by_state_root(
                     block,
                 )
                 .await;
-
-            debug!(%slot, state_root, block_root = header.root, "storing slot with block");
 
             // find current block's parent_root (parent hash value)
             // from table beacon_blocks
@@ -227,17 +227,26 @@ pub async fn sync_slot_by_state_root(
     // only pattern match will store operation allowed
     if let Some(ref validator_balances) = validator_balances {
         debug!("validator balances present");
-        let validator_balances_sum = balances::sum_validator_balances(validator_balances);
+        let validator_balances_sum =
+            balances::sum_validator_balances(validator_balances);
         balances::store_validators_balance(
             &mut *transaction,
             state_root,
             slot,
             &validator_balances_sum,
-        ).await;
+        )
+        .await;
 
         if let Some((_, block)) = header_block_tuple {
-            let deposit_sum_aggregated = deposits::get_deposit_sum_aggregated(&mut *transaction, &block).await;
-            let withdrawal_sum_aggregated = withdrawals::get_withdrawal_sum_aggregated(&mut *transaction, &block).await;
+            let deposit_sum_aggregated =
+                deposits::get_deposit_sum_aggregated(&mut *transaction, &block)
+                    .await;
+            let withdrawal_sum_aggregated =
+                withdrawals::get_withdrawal_sum_aggregated(
+                    &mut *transaction,
+                    &block,
+                )
+                .await;
 
             issuance::store_issuance(
                 &mut *transaction,
@@ -247,8 +256,9 @@ pub async fn sync_slot_by_state_root(
                     &validator_balances_sum,
                     &withdrawal_sum_aggregated,
                     &deposit_sum_aggregated,
-                )
-            ).await;
+                ),
+            )
+            .await;
         }
 
         // todo! update the latest slot value to db table , but this haven't finish yet
@@ -281,5 +291,267 @@ pub async fn sync_slot_by_state_root(
 
 async fn update_deferrable_analysis(db_pool: &PgPool) -> Result<()> {
     // todo : refresh update cache, but now we haven't implement this yet
+    Ok(())
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+struct HeadEvent {
+    #[serde(deserialize_with = "slot_from_string")]
+    slot: Slot,
+    block: String,
+    state: String,
+}
+
+// extract required fields from BeaconHeaderSignedEEnvelope
+// to initialize instance of HeadEvent
+impl From<BeaconHeaderSignedEnvelope> for HeadEvent {
+    fn from(envelop: BeaconHeaderSignedEnvelope) -> Self {
+        Self {
+            state: envelop.header.message.state_root,
+            block: envelop.root,
+            slot: envelop.header.message.slot,
+        }
+    }
+}
+
+/**
+This function takes a starting slot (`start_slot`) as input and streams all slot numbers within the range [start_slot, end_slot],
+where the `end_slot` is dynamically determined by the latest `head.slot` received from the Beacon API's event stream.
+The function subscribes to the Beacon API's `head` event stream, which provides the latest slot numbers as they are confirmed.
+
+It checks for any gaps between the received slots and fills them in accordingly.
+
+The valid slot numbers are then sent concurrently into a buffer using the `tx` (write) channel, allowing for multiple threads
+to perform this operation.
+
+Finally, the `tx` channel is released, and the `rx` (read) channel is returned to the caller.
+The caller can then iterate over the buffer via the `rx` handler to access the slot numbers as they are processed.
+*/
+async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item = Slot> {
+    let beacon_url = ENV_CONFIG
+        .beacon_url
+        .as_ref()
+        .expect("BEACON_URL is required for env to stream beacon updates");
+    let url_string = format!("{beacon_url}/eth/v1/events/?topics=head");
+    let url = reqwest::Url::parse(&url_string).unwrap();
+
+    // client created for subscribe event stream from beacon API endpoint
+    let client = eventsource::reqwest::Client::new(url);
+
+    // create a buffer space with buffer write channel as tx and read channel as rx
+    let (mut tx, rx) = futures::channel::mpsc::unbounded();
+
+    tokio::spawn(async move {
+        let mut last_slot = slot_to_follow;
+
+        // Events received from the client might not arrive in strict sequential order, and gaps between slot values may occur.
+        // To handle this, we detect gaps between the received head.slot and the last known local slot, and fill in the missing slots accordingly.
+        for event in client {
+            // subscribed event item from remote
+            let event = event.unwrap();
+
+            // use pattern match filter event type we care about
+            match event.event_type {
+                Some(ref event_type) if event_type == "head" => {
+                    let head =
+                        serde_json::from_str::<HeadEvent>(&event.data).unwrap();
+
+                    // header event's beacon latest slot value -> head.slot
+                    // local begin sync slot value -> slot_to_follow = last_slot
+                    // take this if expression to check there exists gap between two slots: head.slot and last_slot
+                    if head.slot > last_slot && head.slot != last_slot + 1 {
+                        for missing_slot in (last_slot + 1).0..head.slot.0 {
+                            debug!(
+                                missing_slot,
+                                "add missing slot to slots stream"
+                            );
+                            // appending missing slot that located between [last_slot, head.slot] via buffer write channel handler
+                            tx.send(Slot(missing_slot)).await.unwrap();
+                        }
+                    }
+                    // update last_slot value, and continue process next event's header slot value
+                    last_slot = head.slot;
+                    tx.send(head.slot).await.unwrap();
+                }
+
+                Some(event) => {
+                    warn!(event, "received an event from server that wes not head event, discard it!")
+                }
+
+                None => {
+                    debug!("received an empty server event, discard it!")
+                }
+            }
+        }
+    });
+    rx
+}
+
+// after we fetch the start slot value from db or init value of Slot(0)
+// next we query from the beacon endpoint to extract the remote slot value from the latest header message
+// gte_slot --> our local latest slot value, and it is also the start slot
+// value we gonna fetch from the remote beacon endpoint [start = gte_slot, end = last_slot_on_start]
+async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item = Slot> {
+    debug!("streaming slots from {gte_slot}");
+
+    let beacon_node = BeaconNodeHttp::new();
+
+    // extract the remote slot value from the latest header message as the last_slot_on_start
+    let last_slot_on_start = beacon_node
+        .get_last_header()
+        .await
+        .unwrap()
+        .header
+        .message
+        .slot;
+
+    debug!("last slot on chain: {}", &last_slot_on_start);
+    let slots_stream = stream_slots(last_slot_on_start).await;
+
+    // slot_range => [start_slot = gte_slot, end_slot = last_slot_on_start]
+    let slot_range = SlotRange::new(gte_slot, last_slot_on_start);
+
+    let historic_slots_stream = stream::iter(slot_range);
+    historic_slots_stream.chain(slots_stream)
+}
+
+async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item = Slot> {
+    // before we start to fetch data from beacon endpoints
+    // we first fetch local db table beacon_states to get the latest/freshest record value and extract record's slot value,
+    // let's say the LOCAL_LATEST_SLOT_VALUE
+    // if no records exists in the db table beacon_states, we take Slot(0) as the slot value
+    // let's say the LOCAL_LATEST_SLOT_VALUE
+    let last_synced_state = states::get_last_state(db_pool).await;
+    let next_slot_to_sync =
+        last_synced_state.map_or(Slot(0), |state| state.slot + 1);
+
+    // there we already go the next_slot_to_sync the LOCAL_LATEST_SLOT_VALUE
+    // then we got the next slot value to be sync from beacon endpoint is LOCAL_LATEST_SLOT_VALUE + 1
+    stream_slots_from(next_slot_to_sync).await
+}
+
+// this function will delete multiple records from beacon tables,
+// that the records locates by the given slot range [given_slot, ...)
+pub async fn rollback_slots(
+    executor: &mut PgConnection,
+    greater_than_or_equal: Slot,
+) -> Result<()> {
+    debug!("rolling back data based on slots locates in range of [{greater_than_or_equal}, ...]");
+    let mut transaction = executor.begin().await?;
+    // todo: update table eth_supply but we haven't implement this table's associated function yet, leave a todo here
+    blocks::delete_blocks(&mut *transaction, greater_than_or_equal).await;
+    issuance::delete_issuances(&mut *transaction, greater_than_or_equal).await;
+    balances::delete_validator_sums(&mut *transaction, greater_than_or_equal)
+        .await;
+    states::delete_states(&mut *transaction, greater_than_or_equal).await;
+    transaction.commit().await?;
+    Ok(())
+}
+
+// this function will delete records from multiple beacon tables
+// that the records in the beacon tables share the same slot value provided by the parameter
+pub async fn rollback_slot(
+    executor: &mut PgConnection,
+    slot: Slot,
+) -> Result<()> {
+    debug!("rolling back data from db tables based on the given slot {slot}");
+    let mut transaction = executor.begin().await?;
+    // todo: update table eth_supply but we haven't implement this table's associated function yet, leave a todo here
+    // first - delete block record in beacon_blocks table that the block locates in the given slot period(12 s) on beacon chain
+    blocks::delete_block(&mut *transaction, slot).await;
+
+    // second - delete issuance records in beacon_issuance table
+    issuance::delete_issuance(&mut *transaction, slot).await;
+
+    // third - delete validator sum from beacon_validators_balance tabel
+    balances::delete_validator_sum(&mut *transaction, slot).await;
+
+    // last -- delete record from table beacon_states -- this should be the last delete, because the above table deletion all refers to
+    // record in beacon_states
+    states::delete_state(&mut *transaction, slot).await;
+    transaction.commit().await?;
+    Ok(())
+}
+
+// calculate the slot lag between on chain slot and local(off chain) slot value
+async fn estimate_slots_remaining(
+    executor: impl PgExecutor<'_>,
+    beacon_node: &BeaconNodeHttp,
+) -> i32 {
+    // on beacon chain latest slot value (slot value is increase and beacon chain global unique value)
+    let last_slot_on_chain = beacon_node.get_last_header().await.unwrap();
+
+    // off chain local recorded latest slot value
+    let last_slot_off_chain = states::get_last_state(executor)
+        .await
+        .map_or(Slot(0), |state| state.slot);
+
+    // calculate how many slots remain to be sync from remote to local
+    let lag = last_slot_on_chain.slot().0 - last_slot_off_chain.0;
+    debug!("#estimate_slots_remaining {}", lag);
+    return lag;
+}
+
+// search db's beacon_states table
+// first query state_root value from beacon_states via given starting_candidate value
+// second query beacon endpoint to fetch the given starting_candidate's state_root value
+// if beacon on chain state value match with the local given slot's state_root value , then the given slot value is the `last_matching_slot` value return
+// otherwise, decrease the value of the given slot(starting_candidate) as candidate_slot value and take this `candidate_slot` value
+// query -> from local db's beacon-states table's state_root value off-chain
+// query -> from remote beacon url endpoint's state_root value  on-chain
+// continue compare
+async fn find_last_matching_slot(
+    db_pool: &PgPool,
+    beacon_node: &BeaconNodeHttp,
+    starting_candidate: Slot,
+) -> Result<Slot> {
+    let mut candidate_slot = starting_candidate;
+    let mut off_chain_state_root =
+        states::get_state_root_by_slot(db_pool, candidate_slot).await;
+
+    // take the init slot value query beacon chain to get the given slot's state_root value from beacon chain's response message
+    let mut on_chain_state_root = beacon_node
+        .get_header_by_slot(candidate_slot)
+        .await?
+        .map(|envelope| envelope.header.message.state_root);
+
+    loop {
+        match (off_chain_state_root, on_chain_state_root) {
+            (Some(off_chain_state_root), Some(on_chain_state_root))
+                if off_chain_state_root == on_chain_state_root =>
+            {
+                debug!(off_chain_state_root, on_chain_state_root, "off-chain and on-chain state root value match by given slot: {candidate_slot}");
+                break;
+            }
+
+            _ => {
+                // refresh the candidate_slot minus it by 1
+                candidate_slot = candidate_slot - 1;
+
+                // continue query off chain state_root value via the new candidate_slot  --> local db table beacon-_states
+                off_chain_state_root =
+                    states::get_state_root_by_slot(db_pool, candidate_slot)
+                        .await;
+
+                // continue query on chain state_root value via the new candidate_slot --> parse from beacon endpoint response message
+                on_chain_state_root = beacon_node
+                    .get_header_by_slot(candidate_slot)
+                    .await?
+                    .map(|msg| msg.header.message.state_root);
+            }
+        }
+    } // loop
+
+    debug!(
+        slot = candidate_slot.0,
+        "found a state match between stored and on-chain"
+    );
+    Ok(candidate_slot)
+}
+
+pub async fn sync_beacon_states() -> Result<()> {
+    info!("syncing beacon states");
+
+    // todo: finish this in next commit
     Ok(())
 }
