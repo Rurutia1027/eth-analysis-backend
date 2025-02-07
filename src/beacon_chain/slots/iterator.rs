@@ -115,6 +115,9 @@ mod tests {
 
     // this function should interact with the db table beacon_states' inner records
     // but to simplicity the logic focus on testing slot range iterators we mock this function here
+
+    // generate multiple slots after given slot value
+    // then return the generated mock slots in order and return as stream iterator
     async fn mock_stream_slots(slot: Slot) -> Iter<IntoIter<Slot>> {
         // We will mock a sequence of 5 slots for testing purposes.
         let mock_slots = vec![
@@ -130,6 +133,7 @@ mod tests {
             Slot(slot.0 + 10),
         ];
 
+        // convert vector of Slots into stream iterator
         stream::iter(mock_slots)
     }
 
@@ -160,7 +164,9 @@ mod tests {
 
         let historic_slots_stream = stream::iter(slot_range);
 
-        // Box the resulting stream to handle the recursion and return it
+
+        // combine two stream items together: append generated mocked slot stream
+        // to the historic_slots_stream
         Box::pin(historic_slots_stream.chain(slots_stream))
     }
 
