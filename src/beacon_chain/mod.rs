@@ -17,7 +17,7 @@ pub use node::mock_block::{
 };
 
 pub use node::mock_beacon_node::MockBeaconHttpNode;
-pub use slots::{slot_from_string, Slot};
+pub use slots::{slot_from_string, Slot, };
 
 lazy_static! {
     pub static ref GENESIS_TIMESTAMP: DateTime<Utc> =

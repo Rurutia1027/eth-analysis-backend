@@ -1,4 +1,5 @@
 use crate::beacon_chain::deposits;
+use crate::beacon_chain::slots::SlotRange;
 use crate::env::ENV_CONFIG;
 use crate::{
     beacon_chain::node::{
@@ -137,7 +138,6 @@ pub async fn sync_slot_by_state_root(
     // first we take the off chain slot value send request to beacon chain endpoint
     // to fetch the lag value between local off chain slot and on chain latest slot value
     let sync_lag = get_sync_lag(beacon_node, slot).await?;
-    debug!(%sync_lag, "beacon sync lag ");
 
     let SyncData {
         header_block_tuple,
@@ -178,7 +178,6 @@ pub async fn sync_slot_by_state_root(
                 )
                 .await;
 
-            debug!(%slot, state_root, block_root = header.root, "storing slot with block");
 
             // find current block's parent_root (parent hash value)
             // from table beacon_blocks
@@ -227,17 +226,26 @@ pub async fn sync_slot_by_state_root(
     // only pattern match will store operation allowed
     if let Some(ref validator_balances) = validator_balances {
         debug!("validator balances present");
-        let validator_balances_sum = balances::sum_validator_balances(validator_balances);
+        let validator_balances_sum =
+            balances::sum_validator_balances(validator_balances);
         balances::store_validators_balance(
             &mut *transaction,
             state_root,
             slot,
             &validator_balances_sum,
-        ).await;
+        )
+        .await;
 
         if let Some((_, block)) = header_block_tuple {
-            let deposit_sum_aggregated = deposits::get_deposit_sum_aggregated(&mut *transaction, &block).await;
-            let withdrawal_sum_aggregated = withdrawals::get_withdrawal_sum_aggregated(&mut *transaction, &block).await;
+            let deposit_sum_aggregated =
+                deposits::get_deposit_sum_aggregated(&mut *transaction, &block)
+                    .await;
+            let withdrawal_sum_aggregated =
+                withdrawals::get_withdrawal_sum_aggregated(
+                    &mut *transaction,
+                    &block,
+                )
+                .await;
 
             issuance::store_issuance(
                 &mut *transaction,
@@ -247,8 +255,9 @@ pub async fn sync_slot_by_state_root(
                     &validator_balances_sum,
                     &withdrawal_sum_aggregated,
                     &deposit_sum_aggregated,
-                )
-            ).await;
+                ),
+            )
+            .await;
         }
 
         // todo! update the latest slot value to db table , but this haven't finish yet
@@ -282,4 +291,102 @@ pub async fn sync_slot_by_state_root(
 async fn update_deferrable_analysis(db_pool: &PgPool) -> Result<()> {
     // todo : refresh update cache, but now we haven't implement this yet
     Ok(())
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+struct HeadEvent {
+    #[serde(deserialize_with = "slot_from_string")]
+    slot: Slot,
+    block: String,
+    state: String,
+}
+
+// extract required fields from BeaconHeaderSignedEEnvelope
+// to initialize instance of HeadEvent
+impl From<BeaconHeaderSignedEnvelope> for HeadEvent {
+    fn from(envelop: BeaconHeaderSignedEnvelope) -> Self {
+        Self {
+            state: envelop.header.message.state_root,
+            block: envelop.root,
+            slot: envelop.header.message.slot,
+        }
+    }
+}
+
+async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item = Slot> {
+    let beacon_url = ENV_CONFIG
+        .beacon_url
+        .as_ref()
+        .expect("BEACON_URL is required for env to stream beacon updates");
+    let url_string = format!("{beacon_url}/eth/v1/events/?topics=head");
+    let url = reqwest::Url::parse(&url_string).unwrap();
+
+    // client created for subscribe event stream from beacon API endpoint
+    let client = eventsource::reqwest::Client::new(url);
+
+    // create a buffer space with buffer write channel as tx and read channel as rx
+    let (mut tx, rx) = futures::channel::mpsc::unbounded();
+
+    tokio::spawn(async move {
+        let mut last_slot = slot_to_follow;
+        for event in client {
+            // subscribed event item from remote
+            let event = event.unwrap();
+
+            // use pattern match filter event type we care about
+            match event.event_type {
+                Some(ref event_type) if event_type == "head" => {
+                    let head =
+                        serde_json::from_str::<HeadEvent>(&event.data).unwrap();
+
+                    // here we detect the forward gaps between received slots, and fill them in
+                    if head.slot > last_slot && head.slot < last_slot + 1 {
+                        for missing_slot in (last_slot + 1).0..head.slot.0 {
+                            debug!(
+                                missing_slot,
+                                "add missing slot to slots stream"
+                            );
+                            tx.send(Slot(missing_slot)).await.unwrap();
+                        }
+                    }
+                    last_slot = head.slot;
+                    tx.send(head.slot).await.unwrap();
+                }
+
+                Some(event) => {
+                    warn!(event, "received an event from server that wes not head event, discard it!")
+                }
+
+                None => {
+                    debug!("received an empty server event, discard it!")
+                }
+            }
+        }
+    });
+    rx
+}
+
+async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item = Slot> {
+    debug!("streaming slots from {gte_slot}");
+
+    let beacon_node = BeaconNodeHttp::new();
+    let last_slot_on_start = beacon_node
+        .get_last_header()
+        .await
+        .unwrap()
+        .header
+        .message
+        .slot;
+    debug!("last slot on chain: {}", &last_slot_on_start);
+    let slots_stream = stream_slots(last_slot_on_start).await;
+    let slot_range = SlotRange::new(gte_slot, last_slot_on_start);
+    let historic_slots_stream = stream::iter(slot_range);
+    historic_slots_stream.chain(slots_stream)
+}
+
+async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item = Slot> {
+    let last_synced_state = states::get_last_state(db_pool).await;
+    let next_slot_to_sync =
+        last_synced_state.map_or(Slot(0), |state| state.slot + 1);
+    stream_slots_from(next_slot_to_sync).await
 }
