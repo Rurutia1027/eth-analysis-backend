@@ -178,7 +178,7 @@ pub async fn sync_slot_by_state_root(
                     &mut *transaction,
                     block,
                 )
-                    .await;
+                .await;
 
             // find current block's parent_root (parent hash value)
             // from table beacon_blocks
@@ -186,7 +186,7 @@ pub async fn sync_slot_by_state_root(
                 &mut *transaction,
                 &header.parent_root(),
             )
-                .await;
+            .await;
 
             // if current block's parent block hash not exist in local table
             // throw error message
@@ -204,7 +204,7 @@ pub async fn sync_slot_by_state_root(
                 &header.state_root(),
                 header.slot(),
             )
-                .await;
+            .await;
 
             // after the on chain state_root value this anchor is saved, we continue store on chain fetched beacon block
             blocks::store_block(
@@ -218,7 +218,7 @@ pub async fn sync_slot_by_state_root(
                 &withdrawal_sum_aggregated, // current block withdrawals' amount + block's parent withdrawals aggregated sum
                 header,
             )
-                .await;
+            .await;
         }
     }
 
@@ -235,7 +235,7 @@ pub async fn sync_slot_by_state_root(
             slot,
             &validator_balances_sum,
         )
-            .await;
+        .await;
 
         if let Some((_, block)) = header_block_tuple {
             let deposit_sum_aggregated =
@@ -246,7 +246,7 @@ pub async fn sync_slot_by_state_root(
                     &mut *transaction,
                     &block,
                 )
-                    .await;
+                .await;
 
             issuance::store_issuance(
                 &mut *transaction,
@@ -258,7 +258,7 @@ pub async fn sync_slot_by_state_root(
                     &deposit_sum_aggregated,
                 ),
             )
-                .await;
+            .await;
         }
 
         // todo! update the latest slot value to db table , but this haven't finish yet
@@ -327,7 +327,7 @@ to perform this operation.
 Finally, the `tx` channel is released, and the `rx` (read) channel is returned to the caller.
 The caller can then iterate over the buffer via the `rx` handler to access the slot numbers as they are processed.
 */
-async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item=Slot> {
+async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item = Slot> {
     let beacon_url = ENV_CONFIG
         .beacon_url
         .as_ref()
@@ -391,7 +391,7 @@ async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item=Slot> {
 // next we query from the beacon endpoint to extract the remote slot value from the latest header message
 // gte_slot --> our local latest slot value, and it is also the start slot
 // value we gonna fetch from the remote beacon endpoint [start = gte_slot, end = last_slot_on_start]
-async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item=Slot> {
+async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item = Slot> {
     debug!("streaming slots from {gte_slot}");
 
     let beacon_node = BeaconNodeHttp::new();
@@ -415,7 +415,7 @@ async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item=Slot> {
     historic_slots_stream.chain(slots_stream)
 }
 
-async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item=Slot> {
+async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item = Slot> {
     // before we start to fetch data from beacon endpoints
     // we first fetch local db table beacon_states to get the latest/freshest record value and extract record's slot value,
     // let's say the LOCAL_LATEST_SLOT_VALUE
@@ -518,11 +518,11 @@ async fn find_last_matching_slot(
     loop {
         match (off_chain_state_root, on_chain_state_root) {
             (Some(off_chain_state_root), Some(on_chain_state_root))
-            if off_chain_state_root == on_chain_state_root =>
-                {
-                    debug!(off_chain_state_root, on_chain_state_root, "off-chain and on-chain state root value match by given slot: {candidate_slot}");
-                    break;
-                }
+                if off_chain_state_root == on_chain_state_root =>
+            {
+                debug!(off_chain_state_root, on_chain_state_root, "off-chain and on-chain state root value match by given slot: {candidate_slot}");
+                break;
+            }
 
             _ => {
                 // refresh the candidate_slot minus it by 1
@@ -578,7 +578,6 @@ pub async fn sync_beacon_states() -> Result<()> {
             info!("sync in progress, {}", progress.get_progress_string());
         }
 
-
         // append current slot item to queue
         slots_queues.push_back(slot_from_stream);
 
@@ -600,7 +599,6 @@ pub async fn sync_beacon_states() -> Result<()> {
             let current_slot_stored_state_root =
                 states::get_state_root_by_slot(&db_pool, slot).await;
 
-
             // Check if the previous slot's state_root matches the previous slot's on-chain state_root value.
             // 1. If the current slot is the initial slot(Slot 0), return true as no it has no previous state_root needs to be checked.
             // 2. Otherwise, retrieve the state_root of slot - 1 from the off-chain database.
@@ -615,7 +613,8 @@ pub async fn sync_beacon_states() -> Result<()> {
             let last_matches = if slot.0 == 0 {
                 true
             } else {
-                let last_stored_state_root = states::get_state_root_by_slot(&db_pool, slot).await;
+                let last_stored_state_root =
+                    states::get_state_root_by_slot(&db_pool, slot).await;
                 match last_stored_state_root {
                     None => false,
                     Some(last_stored_state_root) => {
@@ -632,9 +631,14 @@ pub async fn sync_beacon_states() -> Result<()> {
                 // current slot is empty and last state_root matches.
                 debug!("no state stored for current slot and last slots state_root matches chain");
                 // begin sync from current state and current slot
-                sync_slot_by_state_root(&db_pool, &beacon_node, &on_chain_state_root, slot)
-                    .timed("sync_slot_by_state_root")
-                    .await?;
+                sync_slot_by_state_root(
+                    &db_pool,
+                    &beacon_node,
+                    &on_chain_state_root,
+                    slot,
+                )
+                .timed("sync_slot_by_state_root")
+                .await?;
             } else {
                 // we need to roll back all records associated with the current state_root because it is sync not correctly
                 // and then re-insert the roll-back slots to the queue to re-sync the slot's associated state_root's data(blocks, issuance ...) from beacon chain
@@ -643,11 +647,16 @@ pub async fn sync_beacon_states() -> Result<()> {
                     last_matches,
                     "current slot should be empty, last stored slot state_root should match previous on-chain state_root");
                 let last_matching_slot =
-                    find_last_matching_slot(&db_pool, &beacon_node, slot - 1).await?;
+                    find_last_matching_slot(&db_pool, &beacon_node, slot - 1)
+                        .await?;
                 let first_invalid_slot = last_matching_slot + 1;
                 warn!(slot = last_matching_slot.0, "rolling back to slot");
                 // all records associated with slot values that locate in the range of [first_invalid_slot, ...) will be removed from db tables
-                rollback_slots(&mut *db_pool.acquire().await?, first_invalid_slot).await?;
+                rollback_slots(
+                    &mut *db_pool.acquire().await?,
+                    first_invalid_slot,
+                )
+                .await?;
 
                 // traverse all roll-back slots and re-insert them back to the queue
                 // each slot item in the queue will be converted into sync sub-tasks to fetch remote data and store them to  db tables
