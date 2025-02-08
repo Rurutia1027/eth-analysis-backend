@@ -178,7 +178,7 @@ pub async fn sync_slot_by_state_root(
                     &mut *transaction,
                     block,
                 )
-                .await;
+                    .await;
 
             // find current block's parent_root (parent hash value)
             // from table beacon_blocks
@@ -186,7 +186,7 @@ pub async fn sync_slot_by_state_root(
                 &mut *transaction,
                 &header.parent_root(),
             )
-            .await;
+                .await;
 
             // if current block's parent block hash not exist in local table
             // throw error message
@@ -204,7 +204,7 @@ pub async fn sync_slot_by_state_root(
                 &header.state_root(),
                 header.slot(),
             )
-            .await;
+                .await;
 
             // after the on chain state_root value this anchor is saved, we continue store on chain fetched beacon block
             blocks::store_block(
@@ -218,7 +218,7 @@ pub async fn sync_slot_by_state_root(
                 &withdrawal_sum_aggregated, // current block withdrawals' amount + block's parent withdrawals aggregated sum
                 header,
             )
-            .await;
+                .await;
         }
     }
 
@@ -235,7 +235,7 @@ pub async fn sync_slot_by_state_root(
             slot,
             &validator_balances_sum,
         )
-        .await;
+            .await;
 
         if let Some((_, block)) = header_block_tuple {
             let deposit_sum_aggregated =
@@ -246,7 +246,7 @@ pub async fn sync_slot_by_state_root(
                     &mut *transaction,
                     &block,
                 )
-                .await;
+                    .await;
 
             issuance::store_issuance(
                 &mut *transaction,
@@ -258,7 +258,7 @@ pub async fn sync_slot_by_state_root(
                     &deposit_sum_aggregated,
                 ),
             )
-            .await;
+                .await;
         }
 
         // todo! update the latest slot value to db table , but this haven't finish yet
@@ -327,7 +327,7 @@ to perform this operation.
 Finally, the `tx` channel is released, and the `rx` (read) channel is returned to the caller.
 The caller can then iterate over the buffer via the `rx` handler to access the slot numbers as they are processed.
 */
-async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item = Slot> {
+async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item=Slot> {
     let beacon_url = ENV_CONFIG
         .beacon_url
         .as_ref()
@@ -391,7 +391,7 @@ async fn stream_slots(slot_to_follow: Slot) -> impl Stream<Item = Slot> {
 // next we query from the beacon endpoint to extract the remote slot value from the latest header message
 // gte_slot --> our local latest slot value, and it is also the start slot
 // value we gonna fetch from the remote beacon endpoint [start = gte_slot, end = last_slot_on_start]
-async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item = Slot> {
+async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item=Slot> {
     debug!("streaming slots from {gte_slot}");
 
     let beacon_node = BeaconNodeHttp::new();
@@ -415,7 +415,7 @@ async fn stream_slots_from(gte_slot: Slot) -> impl Stream<Item = Slot> {
     historic_slots_stream.chain(slots_stream)
 }
 
-async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item = Slot> {
+async fn stream_slots_from_last(db_pool: &PgPool) -> impl Stream<Item=Slot> {
     // before we start to fetch data from beacon endpoints
     // we first fetch local db table beacon_states to get the latest/freshest record value and extract record's slot value,
     // let's say the LOCAL_LATEST_SLOT_VALUE
@@ -518,11 +518,11 @@ async fn find_last_matching_slot(
     loop {
         match (off_chain_state_root, on_chain_state_root) {
             (Some(off_chain_state_root), Some(on_chain_state_root))
-                if off_chain_state_root == on_chain_state_root =>
-            {
-                debug!(off_chain_state_root, on_chain_state_root, "off-chain and on-chain state root value match by given slot: {candidate_slot}");
-                break;
-            }
+            if off_chain_state_root == on_chain_state_root =>
+                {
+                    debug!(off_chain_state_root, on_chain_state_root, "off-chain and on-chain state root value match by given slot: {candidate_slot}");
+                    break;
+                }
 
             _ => {
                 // refresh the candidate_slot minus it by 1
@@ -551,7 +551,114 @@ async fn find_last_matching_slot(
 
 pub async fn sync_beacon_states() -> Result<()> {
     info!("syncing beacon states");
+    let db_pool = db::get_db_pool("sync-beacon-states", 3).await;
+    sqlx::migrate!("../../../").run(&db_pool).await.unwrap();
+    let beacon_node = BeaconNodeHttp::new();
 
-    // todo: finish this in next commit
+    // slot stream's non-empty state is the outer loop's cycling condition
+    let mut slots_stream = stream_slots_from_last(&db_pool).await;
+
+    // this queue's non-empty state is the inner loop's cycling condition
+    let mut slots_queues = VecDeque::<Slot>::new();
+
+    // sync operations are divided amd execute as unit of slots cached in slots_queues
+    // sync complete recorder to record the complete progress of the complete synchronize progress
+    let mut progress = pit_wall::Progress::new(
+        "sync beacon states",
+        // we use estimate_slots_remaining this function to estimate the lag value between [off-chain-latest-slot, on-chain-latest-slot]
+        estimate_slots_remaining(&db_pool, &beacon_node)
+            .await
+            .try_into()
+            .unwrap(),
+    );
+
+    while let Some(slot_from_stream) = slots_stream.next().await {
+        // every 100 slots print the sync progress complete message
+        if slot_from_stream.0 % 100 == 0 {
+            info!("sync in progress, {}", progress.get_progress_string());
+        }
+
+
+        // append current slot item to queue
+        slots_queues.push_back(slot_from_stream);
+
+        // inner while loop && get front slot from queue and handling slot's grained sync job
+        while let Some(slot) = slots_queues.pop_front() {
+            debug!(%slot, "analyzing next slot on the queue");
+
+            // get current slot's on the chain state_root value
+            // and expect this response body should always be able to fetch the corresponding on chain state_root value
+            // from beacon chain api endpoint, otherwise, give a panic
+            let on_chain_state_root = beacon_node
+                .get_state_root_by_slot(slot)
+                .await?
+                .unwrap_or_else(|| {
+                    panic!("expect state_root to exist for slot {slot} to sync from queue")
+                });
+
+            // get current slot's off chain db stored state_root value
+            let current_slot_stored_state_root =
+                states::get_state_root_by_slot(&db_pool, slot).await;
+
+
+            // Check if the previous slot's state_root matches the previous slot's on-chain state_root value.
+            // 1. If the current slot is the initial slot(Slot 0), return true as no it has no previous state_root needs to be checked.
+            // 2. Otherwise, retrieve the state_root of slot - 1 from the off-chain database.
+            // -  If no state_root exists in the database for slot-1, return false (mismatch)
+            // - If it exists, compare it with the on-chain state_root for slot-1.
+            //       - If slot-1's on-chain and off-chain state-root match, it means that the data for slot-1 is correctly synced to db, no rollback is needed.
+            //       - If they don't match, a rollback is required to ensure data consistency.
+            // Rollback Process:
+            // - Identify the first slot associated with the mismatched state_root (slot-1), one state_root contains multiple slots, we need to find the last slot from them.
+            // - Remove all data linked to that stata_root (blocks, issuance, deposits, withdrawals) from the database.
+            // - After rollback, reinsert the affected slots into the processing queue for resynchronization.
+            let last_matches = if slot.0 == 0 {
+                true
+            } else {
+                let last_stored_state_root = states::get_state_root_by_slot(&db_pool, slot).await;
+                match last_stored_state_root {
+                    None => false,
+                    Some(last_stored_state_root) => {
+                        let previous_on_chain_state_root = beacon_node
+                            .get_state_root_by_slot(slot - 1)
+                            .await?
+                            .expect("expect state slot before current head to exist");
+                        last_stored_state_root == previous_on_chain_state_root
+                    }
+                }
+            };
+
+            if current_slot_stored_state_root.is_none() && last_matches {
+                // current slot is empty and last state_root matches.
+                debug!("no state stored for current slot and last slots state_root matches chain");
+                // begin sync from current state and current slot
+                sync_slot_by_state_root(&db_pool, &beacon_node, &on_chain_state_root, slot)
+                    .timed("sync_slot_by_state_root")
+                    .await?;
+            } else {
+                // we need to roll back all records associated with the current state_root because it is sync not correctly
+                // and then re-insert the roll-back slots to the queue to re-sync the slot's associated state_root's data(blocks, issuance ...) from beacon chain
+                debug!(
+                    ?current_slot_stored_state_root,
+                    last_matches,
+                    "current slot should be empty, last stored slot state_root should match previous on-chain state_root");
+                let last_matching_slot =
+                    find_last_matching_slot(&db_pool, &beacon_node, slot - 1).await?;
+                let first_invalid_slot = last_matching_slot + 1;
+                warn!(slot = last_matching_slot.0, "rolling back to slot");
+                // all records associated with slot values that locate in the range of [first_invalid_slot, ...) will be removed from db tables
+                rollback_slots(&mut *db_pool.acquire().await?, first_invalid_slot).await?;
+
+                // traverse all roll-back slots and re-insert them back to the queue
+                // each slot item in the queue will be converted into sync sub-tasks to fetch remote data and store them to  db tables
+                for invalid_slot in (first_invalid_slot.0..=slot.0).rev() {
+                    slots_queues.push_front(invalid_slot.into());
+                }
+            }
+        }
+
+        progress.inc_work_done();
+    } // outer while loop
+
     Ok(())
 }
