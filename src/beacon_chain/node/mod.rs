@@ -165,12 +165,12 @@ fn make_state_root_url(slot: Slot) -> String {
     format!("{beacon_url}/eth/v1/beacon/states/{}/root", slot)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ValidatorBalance {
     pub balance: GweiNewtype,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct ValidatorBalancesEnvelope {
     data: Vec<ValidatorBalance>,
 }

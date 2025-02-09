@@ -300,27 +300,36 @@ impl BeaconNode for MockBeaconHttpNode {
         &self,
         slot: Slot,
     ) -> anyhow::Result<Option<StateRoot>> {
-        todo!()
+        Ok(Some(self.state_root.clone()))
     }
 
     async fn get_validator_balances(
         &self,
         state_root: &str,
     ) -> anyhow::Result<Option<Vec<ValidatorBalance>>> {
-        todo!()
+        Ok(Some(self.validator_balances.data.clone()))
     }
 
     async fn get_validators_by_state(
         &self,
         state_root: &str,
     ) -> anyhow::Result<Vec<ValidatorEnvelope>> {
-        todo!()
+        Ok(self.validators.data.clone())
     }
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+
+
+
+
+
+
+
+
 
     #[tokio::test]
     async fn test_load_beacon_header_from_file() {
