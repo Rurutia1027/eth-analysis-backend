@@ -254,12 +254,12 @@ fn make_validators_by_state_url(state_root: &str) -> String {
     )
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Validator {
     pub effective_balance: GweiNewtype,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ValidatorEnvelope {
     pub status: String,
     pub validator: Validator,
@@ -277,7 +277,7 @@ impl ValidatorEnvelope {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct ValidatorsEnvelope {
     data: Vec<ValidatorEnvelope>,
 }

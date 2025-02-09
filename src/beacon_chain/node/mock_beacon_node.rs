@@ -1,8 +1,4 @@
-use crate::beacon_chain::node::{
-    BeaconBlock, BeaconHeader, BeaconHeaderEnvelope,
-    BeaconHeaderSignedEnvelope, BeaconNode, BlockId, FinalityCheckpoint,
-    StateRoot, ValidatorBalance, ValidatorBalancesEnvelope, ValidatorEnvelope,
-};
+use crate::beacon_chain::node::{BeaconBlock, BeaconHeader, BeaconHeaderEnvelope, BeaconHeaderSignedEnvelope, BeaconNode, BlockId, FinalityCheckpoint, StateRoot, ValidatorBalance, ValidatorBalancesEnvelope, ValidatorEnvelope, ValidatorsEnvelope};
 use crate::beacon_chain::states::BeaconState;
 use crate::beacon_chain::Slot;
 use anyhow::{Ok, Result};
@@ -96,11 +92,36 @@ pub fn load_validator_balances_from_file(
     })
 }
 
+pub fn load_validators_from_file(
+    file_path: &String,
+    limit: i32,
+) -> Result<ValidatorsEnvelope> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+    let stream =
+        Deserializer::from_reader(reader).into_iter::<serde_json::Value>();
+    let mut validator_envelopes = Vec::new();
 
-pub fn load_validators_from_file(p0: &String, p1: i32) -> Result<()> {
-    Ok(())
+    for value in stream {
+       let record = value?;
+        if let Some(data_array) = record.get("data").and_then(|item| item.as_array()) {
+            for item in data_array.iter().take(limit as usize) {
+                let validator: ValidatorEnvelope = serde_json::from_value(item.clone())?;
+                validator_envelopes.push(validator);
+
+                if validator_envelopes.len() == limit as usize {
+                    break;
+                }
+            }
+        }
+
+        if validator_envelopes.len() >= limit as usize {
+            break;
+        }
+    }
+
+    Ok(ValidatorsEnvelope{data: validator_envelopes})
 }
-
 
 impl MockBeaconHttpNode {
     pub fn new() -> MockBeaconHttpNode {
@@ -266,12 +287,16 @@ pub mod tests {
     async fn test_load_validators_from_file() {
         // this should support loaded max lines to avoid load all records from file
         let project_root = env!("CARGO_MANIFEST_DIR");
-        let beacon_validators_file = format!( "{project_root}/datasets/beaconchain/validators.json").to_string();
+        let beacon_validators_file =
+            format!("{project_root}/datasets/beaconchain/validators.json")
+                .to_string();
         let data = load_validators_from_file(&beacon_validators_file, 30);
-
-
+        assert!(data.is_ok());
+        let validators = data.unwrap().data.clone();
+        for validator in validators {
+            assert!(validator.effective_balance().0 > 0);
+        }
     }
-
 
     #[tokio::test]
     async fn test_load_finality_checkpoints_from_file() {}
