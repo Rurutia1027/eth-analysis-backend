@@ -321,15 +321,129 @@ impl BeaconNode for MockBeaconHttpNode {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use anyhow::Result;
 
+    /// --- test cases for Mocked Beacon Node ---
 
+    #[tokio::test]
+    async fn test_get_block_by_block_root() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let block = node.get_block_by_block_root("mock_root").await?;
+        assert!(block.is_some());
+        assert_eq!(block.unwrap().body, node.block.body);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_block_by_slot() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let block = node.get_block_by_slot(Slot(123)).await?;
+        assert!(block.is_some());
+        assert_eq!(block.unwrap(), node.block);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_header() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let header = node
+            .get_header(&BlockId::BlockRoot("mock_root".to_string()))
+            .await?;
+        assert!(header.is_some());
+        assert_eq!(header.unwrap(), node.headers);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_header_by_block_root() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let header = node.get_header_by_block_root("mock_root").await?;
+        assert!(header.is_some());
+        assert_eq!(header.unwrap(), node.headers);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_header_by_slot() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let header = node.get_header_by_slot(Slot(123)).await?;
+        assert!(header.is_some());
+        assert_eq!(header.unwrap(), node.headers);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_header_by_state_root() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let header = node
+            .get_header_by_state_root("mock_state_root", Slot(123))
+            .await?;
+        assert!(header.is_some());
+        assert_eq!(header.unwrap(), node.headers);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_last_block() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let block = node.get_last_block().await?;
+        assert_eq!(block, node.block);
+        Ok(())
+    }
 
+    #[tokio::test]
+    async fn test_get_last_finality_checkpoint() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let checkpoint = node.get_last_finality_checkpoint().await?;
+        assert_eq!(checkpoint, node.finalityCheckpoints.finalized);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_last_finalized_block() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let block = node.get_last_finalized_block().await?;
+        assert_eq!(block, node.block);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_last_header() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let header = node.get_last_header().await?;
+        assert_eq!(header.root, "mock_block_root_779000");
+        assert_eq!(header.header.message.slot, Slot(779000));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_state_root_by_slot() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let state_root = node.get_state_root_by_slot(Slot(123)).await?;
+        assert!(state_root.is_some());
+        assert_eq!(state_root.unwrap(), node.state_root);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_validator_balances() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let balances = node.get_validator_balances("mock_state_root").await?;
+        assert!(balances.is_some());
+        assert_eq!(balances.unwrap(), node.validator_balances.data);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_validators_by_state() -> Result<()> {
+        let node = MockBeaconHttpNode::new();
+        let validators =
+            node.get_validators_by_state("mock_state_root").await?;
+        assert_eq!(validators, node.validators.data);
+        Ok(())
+    }
+
+    /// --- test cases for Mocked Beacon Node ---
 
     #[tokio::test]
     async fn test_load_beacon_header_from_file() {
