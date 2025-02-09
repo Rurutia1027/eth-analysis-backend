@@ -10,23 +10,31 @@ use anyhow::{Ok,Result};
 
 pub struct MockBeaconHttpNode;
 
-pub fn load_bacon_header_from_file(
+pub fn load_beacon_header_from_file(
     file_path: &str,
 ) -> Result<BeaconHeaderSignedEnvelope> {
-    let fs_handler = fs::File::open(file_path);
-    if !fs_handler.is_ok() {
-        return Err(anyhow::anyhow!("File not found"));
-    }
-
     let file_content = fs::read_to_string(file_path)?;
 
-    // parse json into structures
+    // parse json into BeaconHeaderSignedEnvelope
     let json_data: serde_json::Value = serde_json::from_str(&file_content)?;
     let beacon_header: BeaconHeaderSignedEnvelope =
         serde_json::from_value(json_data["data"].clone())?;
 
     Ok(beacon_header)
 }
+
+pub fn load_bacon_block_details_from_file(file_path: &str) -> Result<BeaconBlock> {
+    let file_content = fs::read_to_string(file_path)?;
+
+    // parse json into BeaconBlock struct
+    let json_data:serde_json::Value = serde_json::from_str(&file_content)?;
+    let beacon_block:BeaconBlock = serde_json::from_value(json_data["data"]["message"].clone())?;
+    Ok(beacon_block)
+
+}
+
+
+
 
 impl MockBeaconHttpNode {
     pub fn new() -> MockBeaconHttpNode {
@@ -136,14 +144,48 @@ impl BeaconNode for MockBeaconHttpNode {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::beacon_chain::node::mock_beacon_node::load_bacon_header_from_file;
+    use super::*;
 
     #[tokio::test]
-    async fn test_load_bacon_header_from_file() {
+    async fn test_load_beacon_header_from_file() {
         let project_root = env!("CARGO_MANIFEST_DIR");
-        println!("Project root: {}", project_root);
         let beacon_header_file = format!("{project_root}/datasets/beaconchain/block_header.json").to_string();
-        let data = load_bacon_header_from_file(&beacon_header_file);
+        let data = load_beacon_header_from_file(&beacon_header_file);
         assert!(data.is_ok());
+        assert!(data.unwrap().slot().0 > 0);
+    }
+
+
+    #[tokio::test]
+    async fn test_load_block_details_from_file() {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_block_detail_file = format!("{project_root}/datasets/beaconchain/block_details.json").to_string();
+        let data = load_bacon_block_details_from_file(&beacon_block_detail_file);
+        assert!(data.is_ok());
+        assert!(data.unwrap().slot.0 > 0);
+    }
+
+    #[tokio::test]
+    async fn test_load_state_root_from_file(){}
+
+
+    #[tokio::test]
+    async fn test_load_validator_balances_from_file() {
+        // this should support max lines to avoid loading to many records to progress
+    }
+
+    #[tokio::test]
+    async fn test_load_validators_from_file ()  {
+        // this should support loaded max lines to avoid load all records from file
+    }
+
+    #[tokio::test]
+    async  fn test_load_finality_checkpoints_from_file() {
+
+    }
+
+    #[tokio::test]
+    async fn test_load_head_event_from_file() {
+
     }
 }
