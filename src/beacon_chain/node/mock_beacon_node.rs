@@ -1,4 +1,9 @@
-use crate::beacon_chain::node::{BeaconBlock, BeaconHeader, BeaconHeaderEnvelope, BeaconHeaderSignedEnvelope, BeaconNode, BlockId, FinalityCheckpoint, StateRoot, ValidatorBalance, ValidatorBalancesEnvelope, ValidatorEnvelope, ValidatorsEnvelope};
+use crate::beacon_chain::node::{
+    BeaconBlock, BeaconHeader, BeaconHeaderEnvelope,
+    BeaconHeaderSignedEnvelope, BeaconNode, BlockId, CheckpointEnvelope,
+    FinalityCheckpoint, FinalityCheckpoints, StateRoot, ValidatorBalance,
+    ValidatorBalancesEnvelope, ValidatorEnvelope, ValidatorsEnvelope,
+};
 use crate::beacon_chain::states::BeaconState;
 use crate::beacon_chain::Slot;
 use anyhow::{Ok, Result};
@@ -9,7 +14,14 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 
-pub struct MockBeaconHttpNode;
+pub struct MockBeaconHttpNode {
+    pub state_root: StateRoot,
+    pub headers: BeaconHeaderSignedEnvelope,
+    pub block: BeaconBlock,
+    pub validator_balances: ValidatorBalancesEnvelope,
+    pub validators: ValidatorsEnvelope,
+    pub finalityCheckpoints: FinalityCheckpoints,
+}
 
 pub fn load_beacon_header_from_file(
     file_path: &str,
@@ -103,10 +115,13 @@ pub fn load_validators_from_file(
     let mut validator_envelopes = Vec::new();
 
     for value in stream {
-       let record = value?;
-        if let Some(data_array) = record.get("data").and_then(|item| item.as_array()) {
+        let record = value?;
+        if let Some(data_array) =
+            record.get("data").and_then(|item| item.as_array())
+        {
             for item in data_array.iter().take(limit as usize) {
-                let validator: ValidatorEnvelope = serde_json::from_value(item.clone())?;
+                let validator: ValidatorEnvelope =
+                    serde_json::from_value(item.clone())?;
                 validator_envelopes.push(validator);
 
                 if validator_envelopes.len() == limit as usize {
@@ -120,12 +135,88 @@ pub fn load_validators_from_file(
         }
     }
 
-    Ok(ValidatorsEnvelope{data: validator_envelopes})
+    Ok(ValidatorsEnvelope {
+        data: validator_envelopes,
+    })
+}
+
+pub fn load_finality_checkpoints_from_file(
+    file_path: &String,
+) -> Result<FinalityCheckpoints> {
+    let file_content = fs::read_to_string(file_path)?;
+
+    // parse json into BeaconBlock struct
+    let json_data: serde_json::Value = serde_json::from_str(&file_content)?;
+    let finality_checkpoint: FinalityCheckpoints =
+        serde_json::from_value(json_data["data"].clone())?;
+    Ok(finality_checkpoint)
 }
 
 impl MockBeaconHttpNode {
     pub fn new() -> MockBeaconHttpNode {
-        Self {}
+        Self {
+            state_root: Self::load_beacon_state_root(),
+            headers: Self::load_beacon_headers(),
+            validator_balances: Self::load_validator_balances(),
+            validators: Self::load_validators(),
+            block: Self::load_block(),
+            finalityCheckpoints: Self::load_finality_checkpoints(),
+        }
+    }
+
+    fn load_validators() -> ValidatorsEnvelope {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_validators_file =
+            format!("{project_root}/datasets/beaconchain/validators.json")
+                .to_string();
+        load_validators_from_file(&beacon_validators_file, 30).unwrap()
+    }
+
+    fn load_validator_balances() -> ValidatorBalancesEnvelope {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_validator_balances_file = format!(
+            "{project_root}/datasets/beaconchain/validator_balances.json"
+        )
+        .to_string();
+        load_validator_balances_from_file(&beacon_validator_balances_file, 30)
+            .unwrap()
+    }
+
+    fn load_beacon_state_root() -> StateRoot {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_state_root_file =
+            format!("{project_root}/datasets/beaconchain/root.json")
+                .to_string();
+        load_beacon_state_root_from_file(&beacon_state_root_file)
+            .unwrap()
+            .root as StateRoot
+    }
+
+    fn load_beacon_headers() -> BeaconHeaderSignedEnvelope {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_header_file =
+            format!("{project_root}/datasets/beaconchain/block_header.json")
+                .to_string();
+        load_beacon_header_from_file(&beacon_header_file).unwrap()
+    }
+
+    fn load_block() -> BeaconBlock {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_block_detail_file =
+            format!("{project_root}/datasets/beaconchain/block_details.json")
+                .to_string();
+        load_beacon_block_details_from_file(beacon_block_detail_file.as_str())
+            .unwrap()
+    }
+
+    fn load_finality_checkpoints() -> FinalityCheckpoints {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_finality_checkpoint_file = format!(
+            "{project_root}/datasets/beaconchain/finality_checkpoints.json"
+        )
+        .to_string();
+        load_finality_checkpoints_from_file(&beacon_finality_checkpoint_file)
+            .unwrap()
     }
 }
 #[async_trait]
@@ -134,35 +225,35 @@ impl BeaconNode for MockBeaconHttpNode {
         &self,
         block_root: &str,
     ) -> anyhow::Result<Option<BeaconBlock>> {
-        todo!()
+        Ok(Some(self.block.clone()))
     }
 
     async fn get_block_by_slot(
         &self,
         slot: Slot,
     ) -> anyhow::Result<Option<BeaconBlock>> {
-        todo!()
+        Ok(Some(self.block.clone()))
     }
 
     async fn get_header(
         &self,
         block_id: &BlockId,
     ) -> anyhow::Result<Option<BeaconHeaderSignedEnvelope>> {
-        todo!()
+        Ok(Some(self.headers.clone()))
     }
 
     async fn get_header_by_block_root(
         &self,
         block_root: &str,
     ) -> anyhow::Result<Option<BeaconHeaderSignedEnvelope>> {
-        todo!()
+        Ok(Some(self.headers.clone()))
     }
 
     async fn get_header_by_slot(
         &self,
         slot: Slot,
     ) -> anyhow::Result<Option<BeaconHeaderSignedEnvelope>> {
-        todo!()
+        Ok(Some(self.headers.clone()))
     }
 
     async fn get_header_by_state_root(
@@ -170,21 +261,21 @@ impl BeaconNode for MockBeaconHttpNode {
         state_root: &str,
         slot: Slot,
     ) -> anyhow::Result<Option<BeaconHeaderSignedEnvelope>> {
-        todo!()
+        Ok(Some(self.headers.clone()))
     }
 
     async fn get_last_block(&self) -> anyhow::Result<BeaconBlock> {
-        todo!()
+        Ok(self.block.clone())
     }
 
     async fn get_last_finality_checkpoint(
         &self,
     ) -> anyhow::Result<FinalityCheckpoint> {
-        todo!()
+        Ok(self.finalityCheckpoints.finalized.clone())
     }
 
     async fn get_last_finalized_block(&self) -> anyhow::Result<BeaconBlock> {
-        todo!()
+        Ok(self.block.clone())
     }
 
     async fn get_last_header(
@@ -299,8 +390,15 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn test_load_finality_checkpoints_from_file() {}
-
-    #[tokio::test]
-    async fn test_load_head_event_from_file() {}
+    async fn test_load_finality_checkpoints_from_file() {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        let beacon_finality_checkpoint_file = format!(
+            "{project_root}/datasets/beaconchain/finality_checkpoints.json"
+        )
+        .to_string();
+        let data = load_finality_checkpoints_from_file(
+            &beacon_finality_checkpoint_file,
+        );
+        assert!(data.is_ok());
+    }
 }

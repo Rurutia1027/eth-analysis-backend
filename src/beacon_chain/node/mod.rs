@@ -47,17 +47,17 @@ impl Display for BlockId {
         }
     }
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DepositData {
     pub amount: GweiNewtype,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Deposit {
     pub data: DepositData,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Withdrawal {
     #[serde(deserialize_with = "i32_from_string")]
     pub index: i32,
@@ -66,19 +66,19 @@ pub struct Withdrawal {
     pub amount: GweiNewtype,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ExecutionPayload {
     pub block_hash: BlockHash,
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BeaconBlockBody {
     pub deposits: Vec<Deposit>,
     pub execution_payload: Option<ExecutionPayload>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BeaconBlock {
     pub body: BeaconBlockBody,
     pub parent_root: String,
@@ -188,7 +188,7 @@ fn make_validator_balances_by_state_url(state_root: &str) -> String {
 
 pub type BlockRoot = String;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct BeaconHeader {
     #[serde(deserialize_with = "slot_from_string")]
     pub slot: Slot,
@@ -196,12 +196,12 @@ pub struct BeaconHeader {
     pub state_root: StateRoot,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct BeaconHeaderEnvelope {
     pub message: BeaconHeader,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct BeaconHeaderSignedEnvelope {
     /// ROot (hash) of the block this header is about.
     pub root: BlockRoot,
@@ -290,7 +290,7 @@ fn make_finality_checkpoint_url() -> String {
     format!("{beacon_url}/eth/v1/beacon/states/head/finality_checkpoints",)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct FinalityCheckpoint {
     #[allow(dead_code)]
     #[serde(deserialize_with = "i32_from_string")]
@@ -299,12 +299,12 @@ pub struct FinalityCheckpoint {
     root: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct FinalityCheckpoints {
     finalized: FinalityCheckpoint,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct CheckpointEnvelope {
     data: FinalityCheckpoints,
 }
