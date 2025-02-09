@@ -1,13 +1,39 @@
-use crate::beacon_chain::node::{BeaconBlock, BeaconHeader, BeaconHeaderEnvelope, BeaconHeaderSignedEnvelope, BeaconNode, BlockId, FinalityCheckpoint, StateRoot, ValidatorBalance, ValidatorEnvelope};
+use crate::beacon_chain::node::{
+    BeaconBlock, BeaconHeader, BeaconHeaderEnvelope,
+    BeaconHeaderSignedEnvelope, BeaconNode, BlockId, FinalityCheckpoint,
+    StateRoot, ValidatorBalance, ValidatorEnvelope,
+};
 use crate::beacon_chain::Slot;
 use async_trait::async_trait;
+use std::fs;
+use anyhow::{Ok,Result};
 
 pub struct MockBeaconHttpNode;
+
+pub fn load_bacon_header_from_file(
+    file_path: &str,
+) -> Result<BeaconHeaderSignedEnvelope> {
+    let fs_handler = fs::File::open(file_path);
+    if !fs_handler.is_ok() {
+        return Err(anyhow::anyhow!("File not found"));
+    }
+
+    let file_content = fs::read_to_string(file_path)?;
+
+    // parse json into structures
+    let json_data: serde_json::Value = serde_json::from_str(&file_content)?;
+    let beacon_header: BeaconHeaderSignedEnvelope =
+        serde_json::from_value(json_data["data"].clone())?;
+
+    Ok(beacon_header)
+}
 
 impl MockBeaconHttpNode {
     pub fn new() -> MockBeaconHttpNode {
         Self {}
     }
+
+
 }
 #[async_trait]
 impl BeaconNode for MockBeaconHttpNode {
@@ -105,5 +131,19 @@ impl BeaconNode for MockBeaconHttpNode {
         state_root: &str,
     ) -> anyhow::Result<Vec<ValidatorEnvelope>> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::beacon_chain::node::mock_beacon_node::load_bacon_header_from_file;
+
+    #[tokio::test]
+    async fn test_load_bacon_header_from_file() {
+        let project_root = env!("CARGO_MANIFEST_DIR");
+        println!("Project root: {}", project_root);
+        let beacon_header_file = format!("{project_root}/datasets/beaconchain/block_header.json").to_string();
+        let data = load_bacon_header_from_file(&beacon_header_file);
+        assert!(data.is_ok());
     }
 }
