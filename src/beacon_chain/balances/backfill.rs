@@ -165,12 +165,10 @@ pub async fn backfill_balances(
     // here we traverse the query results that organized as buffer iterator
     // iterate each result and validate whether they are valid value ,
     // valid value will be remained to balances as Vector of ValidatorBalance : Vec<validatorBalance>
-    while let Some((state_root, slot, balances_result)) =
-        buffered_tasks.next().await
-    {
-        let validator_balances = {
-            match balances_result {
-                Some(validator_balances) => validator_balances,
+    while let Some((state_root, slot, balances_result)) = buffered_tasks.next().await {
+        let state_root : String = state_root.to_string();
+        let validator_balances = match balances_result {
+                Some(validator_balances) => validator_balances.to_vec(),
                 None => {
                     // progress has it own work estimate counter calculated by estimate_work_todo at the beginning
                     // here we use progress#inc_work_done to let it acc by 1
@@ -178,8 +176,7 @@ pub async fn backfill_balances(
                     progress.inc_work_done();
                     continue;
                 }
-            }
-        };
+            };
 
         // accumulate each item's valance value together and finally got the balance_sum value as the final result
         let balance_sum = balances::sum_validator_balances(&validator_balances);
