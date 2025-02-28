@@ -8,6 +8,11 @@ mod states;
 mod syncer;
 mod withdrawals;
 
+
+pub use balances::backfill;
+pub use states::heal_beacon_states;
+
+
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use serde::Serialize;

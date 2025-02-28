@@ -7,6 +7,29 @@ edition = "2021"
 name="server"
 path="src/bin/server.rs"
 
+
+[[bin]]
+name = "backfill_daily_balances_to_london"
+path = "src/bin/backfill_daily_balances_to_london.rs"
+
+[[bin]]
+name = "backfill_balances_to_london"
+path = "src/bin/backfill_balances_to_london.rs"
+
+[[bin]]
+name = "backfill_hourly_balances"
+path = "src/bin/backfill_hourly_balances.rs"
+
+[[bin]]
+name = "backfill_hourly_balances_to_london"
+path = "src/bin/backfill_hourly_balances_to_london.rs"
+
+[[bin]]
+name = "heal_beacon_states"
+path = "src/bin/heal_beacon_states.rs"
+
+
+
 [dependencies]
 anyhow = { version = "1.0.75", features = ["backtrace"] }
 axum = "0.6.20"
