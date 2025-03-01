@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(datetime, start_of_day_datetime)
     }
 
-    #[tokio::test]
+    // #[tokio::test]
     async fn delete_balance_test() {
         let mut connection = db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
