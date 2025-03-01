@@ -82,12 +82,12 @@ pub async fn backfill_balances(
     granularity: &Granularity,
     from: Slot,
 ) {
-    // create beacon endpint request client side
+    // create beacon endpoint request client side
     // and configure with correct beacon url request parameters and address suffixes
     let beacon_node = BeaconNodeHttp::new();
 
     // invoke estimate_work_todo to get the exactly number of the slots by providing
-    // the unit of the garnularity{day, hour, slot, or epoch} and start slot value
+    // the unit of the garnularity {day, hour, slot, or epoch} and start slot value
     let work_todo = estimate_work_todo(db_pool, granularity, from).await;
 
     // setup a progress instance and assign the specific progress name to it
