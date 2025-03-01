@@ -1,16 +1,15 @@
-use std::fmt::Display;
-use std::str::FromStr;
+use crate::{
+    kv_store::{self, KvStore},
+    time_frames::{GrowingTimeFrame, LimitedTimeFrame, TimeFrame},
+};
 use enum_iterator::Sequence;
 use log::debug;
 use serde::Serialize;
 use serde_json::Value;
 use sqlx::{PgExecutor, PgPool};
+use std::fmt::Display;
+use std::str::FromStr;
 use thiserror::Error;
-use crate::{
-    kv_store::{self, KvStore},
-    time_frames::{GrowingTimeFrame, LimitedTimeFrame, TimeFrame},
-};
-
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Sequence)]
 pub enum CacheKey {
@@ -106,7 +105,6 @@ pub enum ParseCacheKeyError {
     UnknownCacheKey(String),
 }
 
-
 impl FromStr for CacheKey {
     type Err = ParseCacheKeyError;
 
@@ -153,17 +151,19 @@ impl FromStr for CacheKey {
     }
 }
 
-
-pub async fn publish_cache_update<'a>(executor: impl PgExecutor<'a>, key: &CacheKey) {
+pub async fn publish_cache_update<'a>(
+    executor: impl PgExecutor<'a>,
+    key: &CacheKey,
+) {
     sqlx::query!(
         "
             SELECT pg_notify('cache-update', $1)
         ",
         key.to_db_key()
     )
-        .execute(executor)
-        .await
-        .unwrap();
+    .execute(executor)
+    .await
+    .unwrap();
 }
 
 pub async fn get_serialized_caching_value(
@@ -183,11 +183,52 @@ pub async fn set_value<'a>(
         cache_key.to_db_key(),
         &serde_json::to_value(value).expect("expect value to be serializable"),
     )
-        .await;
+    .await;
 }
 
-pub async fn update_and_publish(db_pool: &PgPool, cache_key: &CacheKey, value: impl Serialize) {
+pub async fn update_and_publish(
+    db_pool: &PgPool,
+    cache_key: &CacheKey,
+    value: impl Serialize,
+) {
     set_value(db_pool, cache_key, value).await;
     publish_cache_update(db_pool, cache_key).await;
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{db, env::ENV_CONFIG, kv_store::KVStorePostgres};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+    struct TestJson {
+        name: String,
+        age: i32,
+    }
+
+
+
+    // 	1.	Establish a PostgreSQL database connection and bind it to the Cache.
+    // 	2.	Create a listener to monitor the cache-update event channel in PostgreSQL.
+    // 	3.	When an update occurs, send an event through the cache-update channel with the EffectiveBalanceSum key as a string.
+    // 	4.	Retrieve and parse the event’s payload, then verify if it matches the expected EffectiveBalanceSum key.
+    #[tokio::test]
+    async fn test_publish_cache_update() {
+        let mut connection = db::db::tests::get_test_db_connection().await;
+        publish_cache_update(&mut connection, &CacheKey::EffectiveBalanceSum).await;
+
+        let mut listener =
+            sqlx::postgres::PgListener::connect(ENV_CONFIG.db_url.as_str())
+                .await
+                .unwrap();
+        listener.listen("cache-update").await.unwrap();
+        let notification_future = async { listener.recv().await };
+
+        let notification = notification_future.await.unwrap();
+        assert_eq!(
+            notification.payload(),
+            CacheKey::EffectiveBalanceSum.to_db_key()
+        )
+    }
+}
