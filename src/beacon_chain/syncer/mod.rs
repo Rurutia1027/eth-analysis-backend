@@ -30,16 +30,15 @@ use std::{cmp::Ordering, collections::VecDeque};
 use tracing::{debug, info, warn};
 
 lazy_static! {
-    static ref BLOCK_LAG_LIMIT: Duration = Duration::minutes(5);
+    static ref BLOCK_LAG_LIMIT: Duration = Duration::days(10 * 365);
 }
 
 
 
-
+// todo: modify this from streaming into queue operation to debug
 pub async fn sync_beacon_states() -> Result<()> {
     info!("syncing beacon states");
     let db_pool = db::get_db_pool("sync-beacon-states", 3).await;
-    sqlx::migrate!("../../../").run(&db_pool).await.unwrap();
     let beacon_node = BeaconNodeHttp::new();
 
     // slot stream's non-empty state is the outer loop's cycling condition

@@ -2,7 +2,7 @@ use crate::beacon_chain::node::{
     BeaconHeaderSignedEnvelope, BeaconNode, BeaconNodeHttp,
 };
 use crate::beacon_chain::slots::SlotRange;
-use crate::beacon_chain::{states, Slot, slot_from_string};
+use crate::beacon_chain::{states, Slot, slot_from_string, FIRST_POST_LONDON_SLOT};
 use crate::env::ENV_CONFIG;
 use futures::{stream, SinkExt, Stream, StreamExt};
 use serde::Deserialize;
