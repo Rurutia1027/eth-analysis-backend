@@ -69,7 +69,7 @@ pub struct EnvConfig {
 
 pub fn get_env_config() -> EnvConfig {
     EnvConfig {
-        beacon_url: Option::from("http://127.0.0.1:5052".to_string()),
+        beacon_url: Option::from("https://docs-demo.quiknode.pro".to_string()),
         //get_env_var("BEACON_URL"),
         // bind_public_interface: get_env_bool("BIND_PUBLIC_INTERFACE").unwrap_or(true),
         //db_url: get_env_var("DATABASE_URL").expect("DATABASE_URL is required"),

@@ -5,8 +5,8 @@ use eth_analysis_backend::beacon_chain::{FIRST_POST_LONDON_SLOT, FIRST_POST_MERG
 
 #[tokio::main]
 pub async fn main() {
-    info!("backfilling beacon balances to london");
+    info!("back filling beacon balances to london");
     let db_pool = db::get_db_pool("backfill_daily_balances_to_london", 3).await;
     backfill_balances(&db_pool, &Granularity::Day, FIRST_POST_LONDON_SLOT).await;
-    info!("done with backfilling beacon balances to london");
+    info!("done with back filling beacon balances to london");
 }

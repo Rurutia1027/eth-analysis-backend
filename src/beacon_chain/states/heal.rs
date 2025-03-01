@@ -15,7 +15,6 @@ const HEAL_BEACON_STATES_KEY: &str = "heal-beacon-states";
 
 pub async fn heal_beacon_states() {
     info!("healing reorged states");
-
     let db_pool = db::get_db_pool("heal-beacon-states", 1).await;
     let kv_store = kv_store::KVStorePostgres::new(db_pool.clone());
     let job_tracer: JobProgress<'_, Slot> =
