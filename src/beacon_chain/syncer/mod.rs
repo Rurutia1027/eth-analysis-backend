@@ -1,13 +1,16 @@
+mod cache_refresh;
 mod slot_rollback;
 mod slot_stream;
 mod slot_sync;
-mod sync_tracker;
-mod cache_refresh;
 mod state_sync;
+mod sync_tracker;
 
 use crate::beacon_chain::deposits;
 use crate::beacon_chain::slots::SlotRange;
 use crate::beacon_chain::syncer::slot_rollback::rollback_slots;
+use crate::beacon_chain::syncer::slot_stream::stream_slots_from_last;
+use crate::beacon_chain::syncer::slot_sync::find_last_matching_slot;
+use crate::beacon_chain::syncer::state_sync::sync_slot_by_state_root;
 use crate::env::ENV_CONFIG;
 use crate::{
     beacon_chain::node::{
@@ -33,7 +36,61 @@ lazy_static! {
     static ref BLOCK_LAG_LIMIT: Duration = Duration::days(10 * 365);
 }
 
+pub async fn sync_beacon_states_to_local() -> Result<()> {
+    info!("Starting sync of beacon states...");
 
+    let db_pool = db::get_db_pool("sync-beacon-states", 3).await;
+    let beacon_node = BeaconNodeHttp::new();
+    let mut slots_stream = stream_slots_from_last(&db_pool).await;
+    let mut slots_queue = VecDeque::<Slot>::new();
+
+    while let Some(slot) = slots_stream.next().await {
+        slots_queue.push_back(slot);
+
+        while let Some(slot) = slots_queue.pop_front() {
+            let on_chain_state_root =
+                match beacon_node.get_state_root_by_slot(slot).await? {
+                    Some(root) => root,
+                    None => continue,
+                };
+
+            let stored_state_root =
+                states::get_state_root_by_slot(&db_pool, slot).await;
+
+            if let Some(stored) = stored_state_root {
+                if stored == on_chain_state_root {
+                    continue;
+                }
+
+                let last_matching_slot =
+                    find_last_matching_slot(&db_pool, &beacon_node, slot)
+                        .await?;
+                let first_invalid_slot = last_matching_slot + 1;
+
+                rollback_slots(
+                    &mut *db_pool.acquire().await?,
+                    first_invalid_slot,
+                )
+                .await?;
+
+                for invalid_slot in (first_invalid_slot.0..=slot.0).rev() {
+                    slots_queue.push_front(invalid_slot.into());
+                }
+                continue;
+            }
+
+            sync_slot_by_state_root(
+                &db_pool,
+                &beacon_node,
+                &on_chain_state_root,
+                slot,
+            )
+            .await?;
+        }
+    }
+
+    Ok(())
+}
 
 // todo: modify this from streaming into queue operation to debug
 pub async fn sync_beacon_states() -> Result<()> {

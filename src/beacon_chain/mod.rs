@@ -12,6 +12,7 @@ mod withdrawals;
 pub use balances::backfill;
 pub use states::heal_beacon_states;
 pub use syncer::sync_beacon_states;
+pub use syncer::sync_beacon_states_to_local;
 
 
 use chrono::{DateTime, Utc};
