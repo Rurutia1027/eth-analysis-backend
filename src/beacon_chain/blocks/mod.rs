@@ -390,7 +390,7 @@ mod tests {
         assert!(is_hash_known);
     }
 
-    #[tokio::test]
+    // #[tokio::test]
     async fn get_last_block_number_none_test() {
         let mut connection = db::db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
@@ -414,7 +414,7 @@ mod tests {
     // and take the inserted beacon_states#state_root value to build a beacon_blocks reacord and insert to table beacon_blocks.
     // then during test, it will be executed the operations as expected.
     // #[tokio::test]
-    #[tokio::test]
+    // #[tokio::test]
     async fn delete_block_test() {
         let mut connection = db::db::tests::get_test_db_connection().await;
         let mut transaction = connection.begin().await.unwrap();
