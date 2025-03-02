@@ -97,4 +97,40 @@ impl RelayApi for RelayApiHttp {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use tokio::task;
+    use super::*;
 
+    #[tokio::test]
+    async fn fetch_mev_blocks_test() {
+        let mut server = task::spawn_blocking(|| {
+            mockito::Server::new()
+        }).await.unwrap();
+        server
+            .mock("GET", "/api/block-production?start_slot=0&end_slot=10")
+            .with_status(200)
+            .with_body(
+                json!([{
+                    "slotNumber": 1,
+                    "blockNumber": 9191911,
+                    "blockHash": "abc",
+                    "value": "100"
+                }])
+                    .to_string(),
+            )
+            .create();
+
+        let relay_api = RelayApiHttp::new_with_url(&server.url());
+
+        let blocks = relay_api.fetch_mev_blocks(0, 10).await;
+        assert_eq!(blocks.len(), 1);
+
+        let block = &blocks[0];
+        assert_eq!(block.slot, 1);
+        assert_eq!(block.block_number, 9191911);
+        assert_eq!(block.block_hash, "abc");
+        assert_eq!(block.bid.0, 100);
+    }
+}
