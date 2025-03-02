@@ -8,9 +8,11 @@ pub mod kv_store;
 mod performance;
 pub mod server;
 pub mod units;
-mod caching;
-mod time_frames;
-mod health;
-mod data_integrity;
+pub mod caching;
+pub mod time_frames;
+pub mod health;
+pub mod data_integrity;
+pub mod mev_blocks;
+
 
 pub use data_integrity::check_beacon_state_gaps;
