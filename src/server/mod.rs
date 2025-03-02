@@ -10,7 +10,7 @@ use crate::kv_store::KVStorePostgres;
 use crate::server::caching::Cache;
 
 mod caching;
-
+mod etag_middleware;
 
 lazy_static!{
     static ref FOUR_SECONDS: Duration = Duration::seconds(4);
