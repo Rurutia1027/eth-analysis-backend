@@ -11,3 +11,6 @@ pub mod units;
 mod caching;
 mod time_frames;
 mod health;
+mod data_integrity;
+
+pub use data_integrity::check_beacon_state_gaps;

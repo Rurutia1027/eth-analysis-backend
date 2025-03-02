@@ -33,7 +33,9 @@ path = "src/bin/heal_beacon_states.rs"
 name = "sync_beacon_states"
 path = "src/bin/sync_beacon_states.rs"
 
-
+[[bin]]
+name = "check_beacon_state_gaps"
+path = "src/bin/check_beacon_state_gaps.rs"
 
 [dependencies]
 anyhow = { version = "1.0.75", features = ["backtrace"] }
