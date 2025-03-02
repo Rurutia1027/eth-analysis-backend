@@ -11,6 +11,7 @@ use crate::server::caching::Cache;
 
 mod caching;
 mod etag_middleware;
+mod health;
 
 lazy_static!{
     static ref FOUR_SECONDS: Duration = Duration::seconds(4);
