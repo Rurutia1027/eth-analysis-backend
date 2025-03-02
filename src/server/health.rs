@@ -1,4 +1,5 @@
 use crate::health::{HealthCheckable, HealthStatus};
+use axum::response::IntoResponse;
 use chrono::{DateTime, Duration, Utc};
 use std::sync::RwLock;
 
@@ -23,22 +24,24 @@ impl HealthCheckable for ServerHealth {
     // health status: an update is seen in the last five minutes, or it has been <= 5 mins since the server started.
     fn health_status(&self) -> HealthStatus {
         let now = Utc::now();
-        let last_update = self.last_cache_update
+        let last_update = self
+            .last_cache_update
             .read()
             .unwrap()
             .unwrap_or(self.started_on);
         let time_since_last_update = now - last_update;
         if time_since_last_update < Duration::minutes(5) {
-            HealthStatus::Healthy
+            HealthStatus::Healthy(Some(format!(
+                "[Health] cache has been updated in last 5 minutes"
+            )))
         } else {
             HealthStatus::UnHealthy(Some(format!(
-                "cache has not been updated in {} seconds",
+                "[UnHealth] cache has not been updated in {} seconds",
                 time_since_last_update.num_seconds()
             )))
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -55,8 +58,10 @@ mod tests {
 
         // Then
         match status {
-            HealthStatus::Healthy => {} // Should be healthy as server has just started
-            HealthStatus::UnHealthy(Some(_)) => panic!("Server should be healthy at start"),
+            HealthStatus::Healthy(Some(_)) => {} // Should be healthy as server has just started
+            HealthStatus::UnHealthy(Some(_)) => {
+                panic!("Server should be healthy at start")
+            }
             _ => panic!("Unexpected health status"),
         }
     }
@@ -73,8 +78,10 @@ mod tests {
         // Then: It should still be healthy
         let status = health.health_status();
         match status {
-            HealthStatus::Healthy => {} // Should be healthy because cache was updated
-            HealthStatus::UnHealthy(Some(_)) => panic!("Cache was updated, should be healthy"),
+            HealthStatus::Healthy(Some(_)) => {} // Should be healthy because cache was updated
+            HealthStatus::UnHealthy(Some(_)) => {
+                panic!("Cache was updated, should be healthy")
+            }
             _ => panic!("Unexpected health status"),
         }
     }
@@ -112,8 +119,10 @@ mod tests {
         // Then: Health status should be healthy as it has been less than 5 minutes since server start
         let status = health.health_status();
         match status {
-            HealthStatus::Healthy => {} // Should be healthy as it is within the 5-minute window
-            HealthStatus::UnHealthy(Some(_)) => panic!("Server should be healthy within 5 minutes"),
+            HealthStatus::Healthy(Some(_)) => {} // Should be healthy as it is within the 5-minute window
+            HealthStatus::UnHealthy(Some(_)) => {
+                panic!("Server should be healthy within 5 minutes")
+            }
             _ => panic!("Unexpected health status"),
         }
     }
